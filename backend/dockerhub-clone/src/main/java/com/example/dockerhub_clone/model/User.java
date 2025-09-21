@@ -2,28 +2,39 @@ package com.example.dockerhub_clone.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.Instant;
+import java.util.Set;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", uniqueConstraints = {
+        @UniqueConstraint(columnNames = "username"),
+        @UniqueConstraint(columnNames = "email")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class User {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String username;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String email;
 
     @Column(nullable = false)
-    private String password;
+    private String passwordHash;
 
-    @Enumerated(EnumType.STRING)
-    private Role role; // SUPER_ADMIN, ADMIN, USER
+    private String bio;
+    private String avatarUrl;
+    private boolean active = true;
+
+    private Instant createdAt;
+    private Instant updatedAt;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<UserRole> roles;
 }
