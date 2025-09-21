@@ -5,27 +5,23 @@ import lombok.*;
 import java.time.Instant;
 
 @Entity
-@Table(name = "tags", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"repository_id", "name"})
+@Table(name = "watches", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"user_id", "repository_id"})
 })
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Tag {
+public class Watch {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String name;
-
     private Instant createdAt;
-    private Instant updatedAt;
+
+    @ManyToOne @JoinColumn(name = "user_id")
+    private User user;
 
     @ManyToOne @JoinColumn(name = "repository_id")
     private DockerRepository repository;
-
-    @ManyToOne @JoinColumn(name = "artifact_id")
-    private Artifact artifact;
 }
