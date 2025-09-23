@@ -23,7 +23,8 @@ public class DockerRepository {
 
     private String description;
     private boolean isPublic;
-    private boolean isOfficial;
+    @Column(nullable = false)
+    private boolean isOfficial = false;
 
     private Long starsCount = 0L;
     private Long pullsCount = 0L;
