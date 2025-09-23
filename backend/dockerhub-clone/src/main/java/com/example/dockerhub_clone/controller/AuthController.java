@@ -1,7 +1,12 @@
 package com.example.dockerhub_clone.controller;
 
+import com.example.dockerhub_clone.model.Role;
+import com.example.dockerhub_clone.model.RoleName;
 import com.example.dockerhub_clone.model.User;
+import com.example.dockerhub_clone.model.UserRole;
+import com.example.dockerhub_clone.repository.RoleRepository;
 import com.example.dockerhub_clone.repository.UserRepository;
+import com.example.dockerhub_clone.repository.UserRoleRepository;
 import com.example.dockerhub_clone.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,6 +23,8 @@ public class AuthController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final RoleRepository roleRepository;
+    private final UserRoleRepository userRoleRepository;
 
     @PostMapping("/register")
     public Map<String, String> register(@RequestBody Map<String, String> body) {
@@ -34,6 +41,14 @@ public class AuthController {
                 .build();
 
         userRepository.save(user);
+
+        Role userRole = roleRepository.findByName(RoleName.ROLE_USER)
+                .orElseThrow(() -> new RuntimeException("Default role not found"));
+
+        userRoleRepository.save(UserRole.builder()
+                .user(user)
+                .role(userRole)
+                .build());
 
         return Map.of("message", "User registered successfully");
     }
