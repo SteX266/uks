@@ -16,6 +16,7 @@ public class RepositoryResponseDto {
     private String name;
     private String description;
     private boolean isPublic;
+    private boolean isOfficial;
     private String ownerUsername;
     private Instant createdAt;
 }
