@@ -7,7 +7,8 @@ import lombok.*;
 @Table(name = "collaborators", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"repository_id", "user_id"})
 })
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -16,12 +17,15 @@ public class Collaborator {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Enumerated(EnumType.STRING)
-    private RepoPermission permission;
-
-    @ManyToOne @JoinColumn(name = "repository_id")
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "repository_id")
     private DockerRepository repository;
 
-    @ManyToOne @JoinColumn(name = "user_id")
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "user_id")
     private User user;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private CollaboratorPermission permission;
 }
