@@ -1,18 +1,39 @@
-export default function ProfilePage() {
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { apiFetch } from "../lib/api";
+
+export default function Profile() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    // Example protected request
+    fetch("http://localhost:8080/api/repositories/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => setUser(data))
+      .catch(() => setUser(null));
+  }, [router]);
+
   return (
-    <main className="p-6">
-      <h1 className="text-3xl font-bold mb-4">My Profile</h1>
-      <div className="bg-white p-6 rounded-xl shadow-md w-full max-w-md">
-        <p>
-          <strong>Username:</strong> johndoe
-        </p>
-        <p>
-          <strong>Email:</strong> johndoe@example.com
-        </p>
-        <button className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-          Edit Profile
-        </button>
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="p-6 border rounded shadow-md w-96">
+        <h1 className="text-xl mb-4 font-bold">Profile</h1>
+        {user ? (
+          <pre>{JSON.stringify(user, null, 2)}</pre>
+        ) : (
+          <p>Loading or not authorized...</p>
+        )}
       </div>
-    </main>
+    </div>
   );
 }
