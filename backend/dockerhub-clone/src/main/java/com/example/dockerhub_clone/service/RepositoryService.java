@@ -1,15 +1,18 @@
 package com.example.dockerhub_clone.service;
 
 import com.example.dockerhub_clone.dto.CreateRepositoryRequestDto;
+import com.example.dockerhub_clone.dto.ExploreRepositoryResponseDto;
 import com.example.dockerhub_clone.dto.RepositoryResponseDto;
 import com.example.dockerhub_clone.model.*;
 import com.example.dockerhub_clone.repository.CollaboratorRepository;
 import com.example.dockerhub_clone.repository.DockerRepositoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 @Service
@@ -105,6 +108,14 @@ public class RepositoryService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<ExploreRepositoryResponseDto> listPublicRepositoriesForExplore() {
+        return repoRepository.findByIsPublicTrueOrderByStarsCountDesc()
+                .stream()
+                .map(this::mapToExploreDto)
+                .collect(Collectors.toList());
+    }
+
     // --- Permission Helpers ---
 
     private boolean canRead(User user, DockerRepository repo) {
@@ -148,5 +159,37 @@ public class RepositoryService {
                 .ownerUsername(repo.getOwner().getUsername())
                 .createdAt(repo.getCreatedAt())
                 .build();
+    }
+
+    private ExploreRepositoryResponseDto mapToExploreDto(DockerRepository repo) {
+        return ExploreRepositoryResponseDto.builder()
+                .id(repo.getId())
+                .name(repo.getName())
+                .namespace(repo.getOwner() != null ? repo.getOwner().getUsername() : "")
+                .description(repo.getDescription())
+                .badges(resolveBadges(repo))
+                .tags(repo.getTags() == null ? List.of() : repo.getTags().stream()
+                        .map(Tag::getName)
+                        .collect(Collectors.toList()))
+                .stars(repo.getStarsCount() == null ? 0L : repo.getStarsCount())
+                .pulls(repo.getPullsCount() == null ? 0L : repo.getPullsCount())
+                .updatedAt(repo.getUpdatedAt() != null ? repo.getUpdatedAt() : repo.getCreatedAt())
+                .build();
+    }
+
+    private List<String> resolveBadges(DockerRepository repo) {
+        List<String> badges = new ArrayList<>();
+
+        if (repo.isOfficial()) {
+            badges.add(RepositoryBadge.DOCKER_OFFICIAL_IMAGE.getLabel());
+        }
+        if (repo.isVerifiedPublisher()) {
+            badges.add(RepositoryBadge.VERIFIED_PUBLISHER.getLabel());
+        }
+        if (repo.isSponsoredOss()) {
+            badges.add(RepositoryBadge.SPONSORED_OSS.getLabel());
+        }
+
+        return badges;
     }
 }
