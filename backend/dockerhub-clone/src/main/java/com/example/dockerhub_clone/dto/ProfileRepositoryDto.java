@@ -8,16 +8,12 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 
 @Data
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Builder
-public class RepositoryResponseDto {
-    private Long id;
+public class ProfileRepositoryDto {
     private String name;
     private String description;
-    private boolean isPublic;
-    private boolean isOfficial;
-    private String ownerUsername;
-    private Instant createdAt;
+    private long stars;
     private Instant updatedAt;
 }

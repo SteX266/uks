@@ -97,3 +97,207 @@ export async function fetchExploreRepositories() {
     auth: true,
   });
 }
+
+export interface UserRepository {
+  id: number;
+  name: string;
+  description: string | null;
+  isPublic: boolean;
+  isOfficial: boolean;
+  ownerUsername: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface RepositoryTag {
+  id: number;
+  name: string;
+  artifactDigest: string;
+  repositoryName: string;
+}
+
+export interface RepositoryPayload {
+  name: string;
+  description: string | null;
+  isPublic: boolean;
+}
+
+export async function fetchMyRepositories() {
+  return request<UserRepository[]>("/repositories/me", {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function createRepository(payload: RepositoryPayload) {
+  return request<UserRepository>("/repositories", {
+    method: "POST",
+    body: payload,
+    auth: true,
+  });
+}
+
+export async function updateRepository(id: number, payload: RepositoryPayload) {
+  return request<UserRepository>(`/repositories/${id}`, {
+    method: "PUT",
+    body: payload,
+    auth: true,
+  });
+}
+
+export async function deleteRepository(id: number) {
+  return request<void>(`/repositories/${id}`, {
+    method: "DELETE",
+    auth: true,
+  });
+}
+
+export async function fetchRepositoryTags(repoId: number) {
+  return request<RepositoryTag[]>(`/repositories/${repoId}/tags`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function deleteRepositoryTag(repoId: number, tagName: string) {
+  return request<void>(
+    `/repositories/${repoId}/tags/${encodeURIComponent(tagName)}`,
+    {
+      method: "DELETE",
+      auth: true,
+    }
+  );
+}
+
+export interface ProfileBadge {
+  label: string;
+  description: string;
+}
+
+export interface ProfileRepositorySummary {
+  name: string;
+  description: string | null;
+  stars: number;
+  updatedAt: string | null;
+}
+
+export interface ProfileActivityItem {
+  title: string;
+  detail: string;
+  occurredAt: string;
+}
+
+export interface ProfileResponse {
+  displayName: string;
+  username: string;
+  email: string;
+  bio: string | null;
+  avatarUrl: string | null;
+  memberSince: string;
+  lastActive: string | null;
+  repositoriesPublic: number;
+  repositoriesPrivate: number;
+  badges: ProfileBadge[];
+  featuredRepositories: ProfileRepositorySummary[];
+  recentActivity: ProfileActivityItem[];
+}
+
+export interface UpdateProfilePayload {
+  displayName: string;
+  email: string;
+  bio?: string | null;
+  avatarUrl?: string | null;
+}
+
+export interface UpdatePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export async function fetchProfile() {
+  return request<ProfileResponse>("/profile", {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function updateProfile(payload: UpdateProfilePayload) {
+  return request<ProfileResponse>("/profile", {
+    method: "PUT",
+    body: payload,
+    auth: true,
+  });
+}
+
+export async function updatePassword(payload: UpdatePasswordPayload) {
+  return request<{ message: string }>("/profile/password", {
+    method: "PUT",
+    body: payload,
+    auth: true,
+  });
+}
+
+export interface AdminUser {
+  id: number;
+  displayName: string | null;
+  username: string;
+  email: string;
+  bio: string | null;
+  active: boolean;
+  avatarUrl: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  repositoryCount: number;
+  badges: string[];
+  roles: string[];
+}
+
+export interface UpdateAdminUserPayload {
+  displayName?: string;
+  username?: string;
+  email?: string;
+  bio?: string | null;
+  active?: boolean;
+  badges?: string[];
+}
+
+export interface CreateAdminUserPayload {
+  displayName: string;
+  username: string;
+  email: string;
+  password: string;
+  bio?: string | null;
+}
+
+export async function fetchAdminUsers() {
+  return request<AdminUser[]>("/admin/users", {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function updateAdminUser(
+  userId: number,
+  payload: UpdateAdminUserPayload
+) {
+  return request<AdminUser>(`/admin/users/${userId}`, {
+    method: "PUT",
+    body: payload,
+    auth: true,
+  });
+}
+
+export async function deleteAdminUser(userId: number) {
+  return request<void>(`/admin/users/${userId}`, {
+    method: "DELETE",
+    auth: true,
+  });
+}
+
+export async function createAdminUser(payload: CreateAdminUserPayload) {
+  return request<AdminUser>("/admin/users", {
+    method: "POST",
+    body: payload,
+    auth: true,
+  });
+}

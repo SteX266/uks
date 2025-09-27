@@ -24,6 +24,9 @@ public class User {
     @Column(nullable = false)
     private String username;
 
+    @Column(nullable = false, name = "display_name")
+    private String displayName;
+
     @Column(nullable = false)
     private String email;
 
@@ -37,7 +40,38 @@ public class User {
     private Instant createdAt;
     private Instant updatedAt;
 
+    @Builder.Default
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_badges", joinColumns = @JoinColumn(name = "user_id"))
+    @Enumerated(EnumType.STRING)
+    private Set<UserBadge> badges = new HashSet<>();
+
+    @Builder.Default
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private Set<UserRole> roles = new HashSet<>();
+
+
+
+    @PrePersist
+    public void prePersist() {
+        Instant now = Instant.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        updatedAt = now;
+
+        if (displayName == null || displayName.isBlank()) {
+            displayName = username;
+        }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = Instant.now();
+
+        if (displayName == null || displayName.isBlank()) {
+            displayName = username;
+        }
+    }
 }
 

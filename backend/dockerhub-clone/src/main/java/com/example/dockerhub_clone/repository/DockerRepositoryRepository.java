@@ -10,4 +10,8 @@ public interface DockerRepositoryRepository extends JpaRepository<DockerReposito
     List<DockerRepository> findByOwner(User owner);
     Optional<DockerRepository> findByOwnerAndName(User owner, String name);
     List<DockerRepository> findByIsPublicTrueOrderByStarsCountDesc();
+    long countByOwnerAndIsPublicTrue(User owner);
+    long countByOwnerAndIsPublicFalse(User owner);
+    List<DockerRepository> findTop3ByOwnerOrderByStarsCountDesc(User owner);
+    long countByOwner(User owner);
 }

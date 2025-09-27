@@ -1,37 +1,22 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useMemo, useState } from "react";
+import {
+  ChangeEvent,
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import Image from "next/image";
-
-type Badge = {
-  label: string;
-  description: string;
-};
-
-type Repository = {
-  name: string;
-  description: string;
-  stars: number;
-  updated: string;
-};
-
-type ActivityItem = {
-  title: string;
-  time: string;
-  detail: string;
-};
-
-type ProfileState = {
-  name: string;
-  username: string;
-  email: string;
-  memberSince: string;
-  repositoriesPublic: number;
-  repositoriesPrivate: number;
-  lastActive: string;
-  avatar: string | null;
-};
+import {
+  fetchProfile,
+  updatePassword as updatePasswordRequest,
+  updateProfile as updateProfileRequest,
+  ProfileResponse,
+} from "../lib/api";
 
 type PasswordFormState = {
   currentPassword: string;
@@ -39,70 +24,16 @@ type PasswordFormState = {
   confirmPassword: string;
 };
 
+type ProfileFormState = {
+  displayName: string;
+  email: string;
+  bio: string;
+};
+
 type StatusMessage = {
   kind: "success" | "error";
   text: string;
 } | null;
-
-const badges: Badge[] = [
-  {
-    label: "Verified Publisher",
-    description: "Publishes repositories under verified organizations.",
-  },
-  {
-    label: "Sponsored OSS",
-    description: "Maintains open-source projects with sponsorship backing.",
-  },
-];
-
-const repositories: Repository[] = [
-  {
-    name: "uks-platform",
-    description:
-      "Platform for managing repositories and tracking badge visibility.",
-    stars: 128,
-    updated: "Updated 2 days ago",
-  },
-  {
-    name: "analytics-dashboard",
-    description: "Real-time analytics dashboard for OSS project metrics.",
-    stars: 86,
-    updated: "Updated 5 days ago",
-  },
-  {
-    name: "design-system",
-    description:
-      "Reusable UI components aligned with the product design language.",
-    stars: 54,
-    updated: "Updated 1 week ago",
-  },
-];
-
-const activity: ActivityItem[] = [
-  {
-    title: "Awarded Verified Publisher",
-    time: "3 days ago",
-    detail:
-      "An administrator confirmed all published repositories are verified.",
-  },
-  {
-    title: "New repository: analytics-dashboard",
-    time: "5 days ago",
-    detail: "Created a metrics repository and marked it as Sponsored OSS.",
-  },
-  {
-    title: "Merged design system updates",
-    time: "1 week ago",
-    detail:
-      "Integrated the latest design system components after admin review.",
-  },
-];
-
-const navigationLinks = [
-  { href: "/explore", label: "Explore" },
-  { href: "/repositories", label: "Repositories" },
-  { href: "/admin/users", label: "User administration" },
-];
 
 const quickLinks = [
   { href: "/explore", label: "Browse repositories" },
@@ -110,65 +41,199 @@ const quickLinks = [
   { href: "/repositories", label: "Create repository" },
 ];
 
-const initialProfile: ProfileState = {
-  name: "Anna Peterson",
-  username: "annap",
-  email: "anna@example.com",
-  memberSince: "February 2021",
-  repositoriesPublic: 12,
-  repositoriesPrivate: 5,
-  lastActive: "2 hours ago",
-  avatar: null,
-};
-
 const emptyPasswordForm: PasswordFormState = {
   currentPassword: "",
   newPassword: "",
   confirmPassword: "",
 };
 
+function formatAbsoluteDate(iso: string | null) {
+  if (!iso) {
+    return "—";
+  }
+
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(date);
+}
+
+function formatRelativeTime(iso: string | null) {
+  if (!iso) {
+    return "—";
+  }
+
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  const diff = Date.now() - date.getTime();
+  if (diff <= 0) {
+    return "Just now";
+  }
+
+  const seconds = Math.round(diff / 1000);
+  if (seconds < 60) {
+    return "Just now";
+  }
+
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  }
+
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) {
+    return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  }
+
+  const days = Math.round(hours / 24);
+  if (days < 7) {
+    return `${days} day${days === 1 ? "" : "s"} ago`;
+  }
+
+  const weeks = Math.round(days / 7);
+  if (weeks < 5) {
+    return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
+  }
+
+  const months = Math.round(days / 30);
+  if (months < 12) {
+    return `${months} month${months === 1 ? "" : "s"} ago`;
+  }
+
+  const years = Math.round(days / 365);
+  return `${years} year${years === 1 ? "" : "s"} ago`;
+}
+
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<ProfileState>(initialProfile);
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [profileForm, setProfileForm] = useState({
-    name: profile.name,
-    email: profile.email,
+  const [profile, setProfile] = useState<ProfileResponse | null>(null);
+  const [profileForm, setProfileForm] = useState<ProfileFormState>({
+    displayName: "",
+    email: "",
+    bio: "",
   });
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(
-    profile.avatar
-  );
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileStatus, setProfileStatus] = useState<StatusMessage>(null);
+
   const [passwordForm, setPasswordForm] =
     useState<PasswordFormState>(emptyPasswordForm);
   const [passwordStatus, setPasswordStatus] = useState<StatusMessage>(null);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const mountedRef = useRef(true);
+
+  const loadProfile = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    setProfileStatus(null);
+    setPasswordStatus(null);
+    setPasswordForm(emptyPasswordForm);
+
+    try {
+      const response = await fetchProfile();
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setProfile(response);
+      setProfileForm({
+        displayName: response.displayName ?? "",
+        email: response.email ?? "",
+        bio: response.bio ?? "",
+      });
+      setAvatarPreview(response.avatarUrl ?? null);
+      setIsEditingProfile(false);
+    } catch (error) {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to load profile information.";
+      setLoadError(message);
+    } finally {
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    void loadProfile();
+
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [loadProfile]);
 
   const initials = useMemo(() => {
-    const parts = profile.name.trim().split(" ");
-    if (parts.length === 0) {
+    const name = profile?.displayName ?? profile?.username ?? "";
+    const trimmed = name.trim();
+    if (!trimmed) {
       return "";
     }
 
-    const [first, second] = parts;
-    return (first?.[0] ?? "") + (second?.[0] ?? first?.[1] ?? "");
-  }, [profile.name]);
+    const parts = trimmed.split(" ");
+    if (parts.length === 1) {
+      const [first] = parts;
+      return (first?.[0] ?? "") + (first?.[1] ?? "");
+    }
+
+    return (parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "");
+  }, [profile?.displayName, profile?.username]);
 
   const handleStartEditing = () => {
-    setProfileForm({ name: profile.name, email: profile.email });
-    setAvatarPreview(profile.avatar);
+    if (!profile) {
+      return;
+    }
+
+    setProfileForm({
+      displayName: profile.displayName ?? "",
+      email: profile.email ?? "",
+      bio: profile.bio ?? "",
+    });
+    setAvatarPreview(profile.avatarUrl ?? null);
     setProfileStatus(null);
     setIsEditingProfile(true);
   };
 
   const handleCancelEditing = () => {
-    setProfileForm({ name: profile.name, email: profile.email });
-    setAvatarPreview(profile.avatar);
-    setIsEditingProfile(false);
+    if (!profile) {
+      return;
+    }
+
+    setProfileForm({
+      displayName: profile.displayName ?? "",
+      email: profile.email ?? "",
+      bio: profile.bio ?? "",
+    });
+    setAvatarPreview(profile.avatarUrl ?? null);
     setProfileStatus(null);
+    setIsEditingProfile(false);
   };
 
-  const handleProfileInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleProfileInputChange = (
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = event.target;
     setProfileForm((previous) => ({ ...previous, [name]: value }));
+    setProfileStatus(null);
   };
 
   const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -181,17 +246,19 @@ export default function ProfilePage() {
     const reader = new FileReader();
     reader.onload = () => {
       setAvatarPreview(reader.result as string);
+      setProfileStatus(null);
     };
     reader.readAsDataURL(file);
   };
 
-  const handleProfileSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleProfileSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const trimmedName = profileForm.name.trim();
+    const trimmedDisplayName = profileForm.displayName.trim();
     const trimmedEmail = profileForm.email.trim();
+    const trimmedBio = profileForm.bio.trim();
 
-    if (!trimmedName || !trimmedEmail) {
+    if (!trimmedDisplayName || !trimmedEmail) {
       setProfileStatus({
         kind: "error",
         text: "Display name and email are required.",
@@ -199,26 +266,55 @@ export default function ProfilePage() {
       return;
     }
 
-    setProfile((previous) => ({
-      ...previous,
-      name: trimmedName,
-      email: trimmedEmail,
-      avatar: avatarPreview,
-    }));
+    setIsSavingProfile(true);
+    setProfileStatus(null);
 
-    setIsEditingProfile(false);
-    setProfileStatus({
-      kind: "success",
-      text: "Profile updated for this session.",
-    });
+    try {
+      const updated = await updateProfileRequest({
+        displayName: trimmedDisplayName,
+        email: trimmedEmail,
+        bio: trimmedBio || null,
+        avatarUrl: avatarPreview ?? null,
+      });
+
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setProfile(updated);
+      setProfileForm({
+        displayName: updated.displayName ?? "",
+        email: updated.email ?? "",
+        bio: updated.bio ?? "",
+      });
+      setAvatarPreview(updated.avatarUrl ?? null);
+      setProfileStatus({
+        kind: "success",
+        text: "Profile updated successfully.",
+      });
+      setIsEditingProfile(false);
+    } catch (error) {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      const message =
+        error instanceof Error ? error.message : "Failed to update profile.";
+      setProfileStatus({ kind: "error", text: message });
+    } finally {
+      if (mountedRef.current) {
+        setIsSavingProfile(false);
+      }
+    }
   };
 
   const handlePasswordInputChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
     setPasswordForm((previous) => ({ ...previous, [name]: value }));
+    setPasswordStatus(null);
   };
 
-  const handlePasswordSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handlePasswordSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const trimmedCurrent = passwordForm.currentPassword.trim();
@@ -257,12 +353,80 @@ export default function ProfilePage() {
       return;
     }
 
-    setPasswordForm(emptyPasswordForm);
-    setPasswordStatus({
-      kind: "success",
-      text: "Password updated for this session.",
-    });
+    setIsUpdatingPassword(true);
+
+    try {
+      await updatePasswordRequest({
+        currentPassword: trimmedCurrent,
+        newPassword: trimmedNew,
+      });
+
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setPasswordForm(emptyPasswordForm);
+      setPasswordStatus({
+        kind: "success",
+        text: "Password updated successfully.",
+      });
+    } catch (error) {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      const message =
+        error instanceof Error ? error.message : "Failed to update password.";
+      setPasswordStatus({ kind: "error", text: message });
+    } finally {
+      if (mountedRef.current) {
+        setIsUpdatingPassword(false);
+      }
+    }
   };
+
+  if (isLoading) {
+    return (
+      <main className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-6 py-12 text-slate-100">
+        <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-center gap-6">
+          <div className="rounded-3xl border border-slate-800 bg-slate-900/80 px-8 py-12 text-center text-sm text-slate-300 shadow-xl shadow-black/30 backdrop-blur">
+            Loading profile...
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <main className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-6 py-12 text-slate-100">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+          <div className="rounded-3xl border border-rose-500/40 bg-rose-500/10 p-6 text-sm text-rose-100 shadow-lg shadow-black/30 backdrop-blur">
+            <p>{loadError}</p>
+            <button
+              type="button"
+              onClick={() => void loadProfile()}
+              className="mt-4 rounded-2xl border border-rose-300/50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-rose-100 transition hover:border-rose-200 hover:text-white"
+            >
+              Retry loading profile
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <main className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-6 py-12 text-slate-100">
+        <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-center gap-6">
+          <div className="rounded-3xl border border-slate-800 bg-slate-900/80 px-8 py-12 text-center text-sm text-slate-300 shadow-xl shadow-black/30 backdrop-blur">
+            Profile information is unavailable.
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-6 py-12 text-slate-100">
@@ -293,8 +457,7 @@ export default function ProfilePage() {
                 </Link>
                 <Link
                   href="/repositories"
-                  aria-current="page"
-                  className="rounded-full bg-white/10 px-4 py-2 text-white transition hover:bg-white/20"
+                  className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
                 >
                   Repositories
                 </Link>
@@ -306,7 +469,7 @@ export default function ProfilePage() {
                 </Link>
                 <Link
                   href="/profile"
-                  className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+                  className="rounded-full bg-white/10 px-4 py-2 text-white transition hover:bg-white/20"
                 >
                   Profile
                 </Link>
@@ -348,10 +511,10 @@ export default function ProfilePage() {
             <article className="rounded-3xl border border-slate-800 bg-slate-900/80 p-8 shadow-xl shadow-black/30 backdrop-blur">
               <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-4">
-                  {profile.avatar ? (
+                  {avatarPreview ? (
                     <Image
-                      src={profile.avatar}
-                      alt={`${profile.name} avatar`}
+                      src={avatarPreview}
+                      alt={`${profile.displayName} avatar`}
                       width={64}
                       height={64}
                       className="h-16 w-16 rounded-full object-cover ring-2 ring-indigo-500/40"
@@ -364,20 +527,27 @@ export default function ProfilePage() {
                   )}
                   <div>
                     <h2 className="text-2xl font-semibold text-white">
-                      {profile.name}
+                      {profile.displayName}
                     </h2>
                     <p className="text-sm text-slate-400">
                       @{profile.username} · {profile.email}
                     </p>
+                    {profile.bio ? (
+                      <p className="mt-2 text-sm text-slate-300">
+                        {profile.bio}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
-                <button
-                  className="self-start rounded-2xl border border-indigo-500 px-4 py-2 text-sm font-semibold text-indigo-300 transition hover:border-indigo-400 hover:text-white"
-                  onClick={handleStartEditing}
-                  type="button"
-                >
-                  Edit profile
-                </button>
+                {!isEditingProfile ? (
+                  <button
+                    className="self-start rounded-2xl border border-indigo-500 px-4 py-2 text-sm font-semibold text-indigo-300 transition hover:border-indigo-400 hover:text-white"
+                    onClick={handleStartEditing}
+                    type="button"
+                  >
+                    Edit profile
+                  </button>
+                ) : null}
               </div>
 
               <dl className="mt-8 grid gap-4 text-sm text-slate-300 md:grid-cols-3">
@@ -386,7 +556,7 @@ export default function ProfilePage() {
                     Member since
                   </dt>
                   <dd className="text-lg font-semibold text-white">
-                    {profile.memberSince}
+                    {formatAbsoluteDate(profile.memberSince)}
                   </dd>
                 </div>
                 <div>
@@ -403,7 +573,7 @@ export default function ProfilePage() {
                     Last active
                   </dt>
                   <dd className="text-lg font-semibold text-white">
-                    {profile.lastActive}
+                    {formatRelativeTime(profile.lastActive)}
                   </dd>
                 </div>
               </dl>
@@ -413,15 +583,21 @@ export default function ProfilePage() {
                   Badges
                 </h3>
                 <div className="mt-4 flex flex-wrap gap-3">
-                  {badges.map((badge) => (
-                    <span
-                      key={badge.label}
-                      className="rounded-full border border-indigo-500/40 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-200"
-                      title={badge.description}
-                    >
-                      {badge.label}
-                    </span>
-                  ))}
+                  {profile.badges.length > 0 ? (
+                    profile.badges.map((badge) => (
+                      <span
+                        key={badge.label}
+                        className="rounded-full border border-indigo-500/40 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-200"
+                        title={badge.description}
+                      >
+                        {badge.label}
+                      </span>
+                    ))
+                  ) : (
+                    <p className="text-xs text-slate-500">
+                      No badges earned yet.
+                    </p>
+                  )}
                 </div>
               </div>
             </article>
@@ -439,23 +615,35 @@ export default function ProfilePage() {
                 </Link>
               </div>
               <ul className="mt-6 space-y-4">
-                {repositories.map((repo) => (
-                  <li
-                    key={repo.name}
-                    className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 transition hover:border-indigo-500/40 hover:text-white"
-                  >
-                    <h3 className="text-lg font-semibold text-white">
-                      {repo.name}
-                    </h3>
-                    <p className="mt-1 text-sm text-slate-400">
-                      {repo.description}
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                      <span>⭐ {repo.stars}</span>
-                      <span>{repo.updated}</span>
-                    </div>
+                {profile.featuredRepositories.length > 0 ? (
+                  profile.featuredRepositories.map((repo) => (
+                    <li
+                      key={repo.name}
+                      className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 transition hover:border-indigo-500/40 hover:text-white"
+                    >
+                      <h3 className="text-lg font-semibold text-white">
+                        {repo.name}
+                      </h3>
+                      {repo.description ? (
+                        <p className="mt-1 text-sm text-slate-400">
+                          {repo.description}
+                        </p>
+                      ) : null}
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                        <span>⭐ {repo.stars}</span>
+                        <span>
+                          {repo.updatedAt
+                            ? `Updated ${formatRelativeTime(repo.updatedAt)}`
+                            : "Update time unavailable"}
+                        </span>
+                      </div>
+                    </li>
+                  ))
+                ) : (
+                  <li className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-400">
+                    No repositories to feature yet. Create one to see it here.
                   </li>
-                ))}
+                )}
               </ul>
             </article>
 
@@ -466,20 +654,20 @@ export default function ProfilePage() {
                 </h2>
                 <p className="mt-2 text-sm text-slate-300">
                   Upload a new profile picture and adjust your contact details.
-                  Changes apply immediately for this session.
+                  Changes apply immediately after saving.
                 </p>
                 <form className="mt-6 space-y-5" onSubmit={handleProfileSubmit}>
                   <div className="space-y-1">
                     <label
                       className="text-xs font-semibold uppercase tracking-wide text-slate-500"
-                      htmlFor="profile-name"
+                      htmlFor="profile-display-name"
                     >
                       Display name
                     </label>
                     <input
-                      id="profile-name"
-                      name="name"
-                      value={profileForm.name}
+                      id="profile-display-name"
+                      name="displayName"
+                      value={profileForm.displayName}
                       onChange={handleProfileInputChange}
                       placeholder="Full name"
                       className="w-full rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
@@ -505,6 +693,23 @@ export default function ProfilePage() {
                   <div className="space-y-1">
                     <label
                       className="text-xs font-semibold uppercase tracking-wide text-slate-500"
+                      htmlFor="profile-bio"
+                    >
+                      Bio
+                    </label>
+                    <textarea
+                      id="profile-bio"
+                      name="bio"
+                      value={profileForm.bio}
+                      onChange={handleProfileInputChange}
+                      rows={3}
+                      placeholder="Tell others a bit about your work"
+                      className="w-full rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label
+                      className="text-xs font-semibold uppercase tracking-wide text-slate-500"
                       htmlFor="profile-avatar"
                     >
                       Profile picture
@@ -515,30 +720,19 @@ export default function ProfilePage() {
                       type="file"
                       accept="image/*"
                       onChange={handleAvatarChange}
-                      className="w-full rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 file:mr-4 file:rounded-xl file:border-0 file:bg-indigo-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-400"
+                      className="w-full rounded-2xl border border-dashed border-slate-700/70 bg-slate-950/70 px-4 py-3 text-xs text-slate-400 transition hover:border-indigo-500/60 hover:text-slate-200"
                     />
-                    {avatarPreview && (
-                      <div className="mt-3 flex items-center gap-3">
-                        <Image
-                          src={avatarPreview}
-                          alt="Selected profile preview"
-                          width={64}
-                          height={64}
-                          className="h-16 w-16 rounded-full object-cover ring-2 ring-indigo-500/40"
-                          unoptimized
-                        />
-                        <span className="text-xs text-slate-400">
-                          Preview of your new profile picture
-                        </span>
-                      </div>
-                    )}
+                    <p className="text-xs text-slate-500">
+                      Images are stored for this session only in this demo.
+                    </p>
                   </div>
                   <div className="flex flex-wrap gap-3">
                     <button
                       type="submit"
-                      className="rounded-2xl bg-indigo-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300"
+                      disabled={isSavingProfile}
+                      className="rounded-2xl bg-indigo-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300 disabled:cursor-not-allowed disabled:bg-indigo-500/50"
                     >
-                      Save profile
+                      {isSavingProfile ? "Saving..." : "Save changes"}
                     </button>
                     <button
                       type="button"
@@ -557,16 +751,26 @@ export default function ProfilePage() {
             <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur">
               <h2 className="text-xl font-semibold text-white">Activity</h2>
               <ul className="mt-5 space-y-4 text-sm text-slate-300">
-                {activity.map((item) => (
-                  <li
-                    key={item.title}
-                    className="rounded-2xl border border-slate-800 bg-slate-950/60 p-3"
-                  >
-                    <p className="font-semibold text-white">{item.title}</p>
-                    <p className="text-xs text-slate-500">{item.time}</p>
-                    <p className="mt-1 text-xs text-slate-400">{item.detail}</p>
+                {profile.recentActivity.length > 0 ? (
+                  profile.recentActivity.map((item) => (
+                    <li
+                      key={`${item.title}-${item.occurredAt}`}
+                      className="rounded-2xl border border-slate-800 bg-slate-950/60 p-3"
+                    >
+                      <p className="font-semibold text-white">{item.title}</p>
+                      <p className="text-xs text-slate-500">
+                        {formatRelativeTime(item.occurredAt)}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {item.detail}
+                      </p>
+                    </li>
+                  ))
+                ) : (
+                  <li className="rounded-2xl border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-500">
+                    No activity has been recorded yet.
                   </li>
-                ))}
+                )}
               </ul>
             </section>
 
@@ -593,8 +797,6 @@ export default function ProfilePage() {
                     onChange={handlePasswordInputChange}
                     className="w-full rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                   />
-                </div>
-                <div className="space-y-1">
                   <label
                     className="text-xs font-semibold uppercase tracking-wide text-slate-500"
                     htmlFor="new-password"
@@ -628,9 +830,10 @@ export default function ProfilePage() {
                 </div>
                 <button
                   type="submit"
-                  className="w-full rounded-2xl bg-indigo-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300"
+                  disabled={isUpdatingPassword}
+                  className="w-full rounded-2xl bg-indigo-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300 disabled:cursor-not-allowed disabled:bg-indigo-500/50"
                 >
-                  Update password
+                  {isUpdatingPassword ? "Updating..." : "Update password"}
                 </button>
               </form>
             </section>

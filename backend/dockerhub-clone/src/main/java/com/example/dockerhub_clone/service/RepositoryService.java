@@ -29,8 +29,13 @@ public class RepositoryService {
     public RepositoryResponseDto createRepo(CreateRepositoryRequestDto request) {
         User currentUser = authService.getCurrentUser();
 
+        String name = request.getName() != null ? request.getName().trim() : "";
+        if (name.isEmpty()) {
+            throw new RuntimeException("Repository name is required");
+        }
+
         DockerRepository repo = DockerRepository.builder()
-                .name(request.getName())
+                .name(name)
                 .description(request.getDescription())
                 .isPublic(request.isPublic())
                 .owner(currentUser)
@@ -51,6 +56,10 @@ public class RepositoryService {
 
         if (!canWrite(currentUser, repo)) {
             throw new RuntimeException("Not authorized to edit this repository");
+        }
+
+        if (request.getName() != null && !request.getName().isBlank()) {
+            repo.setName(request.getName().trim());
         }
 
         repo.setDescription(request.getDescription());
@@ -158,6 +167,7 @@ public class RepositoryService {
                 .isOfficial(repo.isOfficial())
                 .ownerUsername(repo.getOwner().getUsername())
                 .createdAt(repo.getCreatedAt())
+                .updatedAt(repo.getUpdatedAt() != null ? repo.getUpdatedAt() : repo.getCreatedAt())
                 .build();
     }
 

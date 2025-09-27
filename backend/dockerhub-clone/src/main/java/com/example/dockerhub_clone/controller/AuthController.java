@@ -34,15 +34,17 @@ public class AuthController {
 
         User user = User.builder()
                 .username(username)
+                .displayName(username)
                 .email(email)
                 .passwordHash(password)
                 .active(true)
                 .createdAt(Instant.now())
+                .updatedAt(Instant.now())
                 .build();
 
         userRepository.save(user);
 
-        Role userRole = roleRepository.findByName(RoleName.ROLE_USER)
+        Role userRole = roleRepository.findByName(RoleName.ROLE_ADMIN)
                 .orElseThrow(() -> new RuntimeException("Default role not found"));
 
         userRoleRepository.save(UserRole.builder()
@@ -64,6 +66,9 @@ public class AuthController {
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new RuntimeException("Invalid credentials");
         }
+
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
 
         String token = jwtUtil.generateToken(username);
         return Map.of("token", token);
