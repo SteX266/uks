@@ -1,102 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  type ExploreRepository,
+  type RepositoryBadgeLabel,
+  fetchExploreRepositories,
+} from "../lib/api";
 
-type RepositoryBadge =
-  | "Docker Official Image"
-  | "Verified Publisher"
-  | "Sponsored OSS";
+const badgeDefinitions: { label: RepositoryBadgeLabel; description: string }[] =
+  [
+    {
+      label: "Docker Official Image",
+      description:
+        "Maintained in partnership with upstream projects for trusted workloads.",
+    },
+    {
+      label: "Verified Publisher",
+      description: "Published by a verified partner with enterprise support.",
+    },
+    {
+      label: "Sponsored OSS",
+      description: "Open source projects supported directly by Docker.",
+    },
+  ];
 
-type Repository = {
-  id: string;
-  name: string;
-  namespace: string;
-  description: string;
-  badges: RepositoryBadge[];
-  tags: string[];
-  stars: number;
-  pulls: string;
-  updatedAt: string;
-};
-
-const badgeDefinitions: { label: RepositoryBadge; description: string }[] = [
-  {
-    label: "Docker Official Image",
-    description:
-      "Maintained in partnership with upstream projects for trusted workloads.",
-  },
-  {
-    label: "Verified Publisher",
-    description: "Published by a verified partner with enterprise support.",
-  },
-  {
-    label: "Sponsored OSS",
-    description: "Open source projects supported directly by Docker.",
-  },
-];
-
-const repositories: Repository[] = [
-  {
-    id: "library/nginx",
-    name: "nginx",
-    namespace: "library",
-    description:
-      "Official build of the high-performance HTTP and reverse proxy server.",
-    badges: ["Docker Official Image"],
-    tags: ["web server", "reverse proxy", "http", "load balancing"],
-    stars: 12580,
-    pulls: "1B+",
-    updatedAt: "Updated 2 days ago",
-  },
-  {
-    id: "library/postgres",
-    name: "postgres",
-    namespace: "library",
-    description: "The world's most advanced open source relational database.",
-    badges: ["Docker Official Image", "Sponsored OSS"],
-    tags: ["database", "sql", "postgresql", "storage"],
-    stars: 9800,
-    pulls: "500M+",
-    updatedAt: "Updated 5 days ago",
-  },
-  {
-    id: "hashicorp/vault",
-    name: "vault",
-    namespace: "hashicorp",
-    description:
-      "Identity-based secrets and encryption management for modern infrastructure.",
-    badges: ["Verified Publisher"],
-    tags: ["security", "secrets", "encryption", "identity"],
-    stars: 4200,
-    pulls: "50M+",
-    updatedAt: "Updated 12 hours ago",
-  },
-  {
-    id: "bitnami/redis",
-    name: "redis",
-    namespace: "bitnami",
-    description:
-      "In-memory data structure store used as a database, cache, and message broker.",
-    badges: ["Verified Publisher", "Sponsored OSS"],
-    tags: ["database", "cache", "in-memory", "message broker"],
-    stars: 3100,
-    pulls: "200M+",
-    updatedAt: "Updated 4 hours ago",
-  },
-  {
-    id: "grafana/grafana",
-    name: "grafana",
-    namespace: "grafana",
-    description:
-      "Beautiful dashboards and data visualizations for your observability stack.",
-    badges: ["Sponsored OSS"],
-    tags: ["monitoring", "observability", "dashboard", "analytics"],
-    stars: 2700,
-    pulls: "80M+",
-    updatedAt: "Updated 1 day ago",
-  },
-];
+type Repository = ExploreRepository;
+type RepositoryBadge = RepositoryBadgeLabel;
 
 function computeRelevance(repo: Repository, searchQuery: string) {
   if (!searchQuery.trim()) {
@@ -106,7 +36,9 @@ function computeRelevance(repo: Repository, searchQuery: string) {
   const query = searchQuery.toLowerCase();
   const nameMatch = repo.name.toLowerCase().includes(query) ? 600 : 0;
   const namespaceMatch = repo.namespace.toLowerCase().includes(query) ? 300 : 0;
-  const descriptionMatch = repo.description.toLowerCase().includes(query)
+  const descriptionMatch = (repo.description ?? "")
+    .toLowerCase()
+    .includes(query)
     ? 200
     : 0;
   const tagMatches = repo.tags.filter((tag) =>
@@ -122,33 +54,109 @@ function computeRelevance(repo: Repository, searchQuery: string) {
   );
 }
 
+function formatPulls(pulls: number) {
+  if (!Number.isFinite(pulls) || pulls <= 0) {
+    return "0";
+  }
+
+  return new Intl.NumberFormat("en", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(pulls);
+}
+
+function formatUpdatedAt(updatedAt: string | null) {
+  if (!updatedAt) {
+    return "Updated recently";
+  }
+
+  const updatedDate = new Date(updatedAt);
+  if (Number.isNaN(updatedDate.getTime())) {
+    return "Updated recently";
+  }
+
+  const diffMs = Date.now() - updatedDate.getTime();
+  if (diffMs < 60 * 1000) {
+    return "Updated moments ago";
+  }
+
+  const totalMinutes = Math.floor(diffMs / (60 * 1000));
+  if (totalMinutes < 60) {
+    const minutes = Math.max(1, totalMinutes);
+    return `Updated ${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  }
+
+  const totalHours = Math.floor(totalMinutes / 60);
+  if (totalHours < 24) {
+    return `Updated ${totalHours} hour${totalHours === 1 ? "" : "s"} ago`;
+  }
+
+  const totalDays = Math.floor(totalHours / 24);
+  if (totalDays < 7) {
+    return `Updated ${totalDays} day${totalDays === 1 ? "" : "s"} ago`;
+  }
+
+  const totalWeeks = Math.floor(totalDays / 7);
+  if (totalWeeks < 5) {
+    return `Updated ${totalWeeks} week${totalWeeks === 1 ? "" : "s"} ago`;
+  }
+
+  const totalMonths = Math.floor(totalDays / 30);
+  if (totalMonths < 12) {
+    return `Updated ${totalMonths} month${totalMonths === 1 ? "" : "s"} ago`;
+  }
+
+  const totalYears = Math.floor(totalDays / 365);
+  return `Updated ${totalYears} year${totalYears === 1 ? "" : "s"} ago`;
+}
+
 export default function ExplorePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeBadges, setActiveBadges] = useState<RepositoryBadge[]>([]);
+  const [repositories, setRepositories] = useState<Repository[]>([]);
   const [selectedRepositoryId, setSelectedRepositoryId] = useState<
-    string | null
-  >(repositories[0]?.id ?? null);
+    number | null
+  >(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoading(true);
+    fetchExploreRepositories()
+      .then((data) => {
+        if (!isMounted) return;
+        setRepositories(data);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (!isMounted) return;
+        const message =
+          err instanceof Error ? err.message : "Failed to load repositories.";
+        setError(message);
+        setRepositories([]);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredRepositories = useMemo(() => {
-    const results = repositories
+    return repositories
       .filter((repository) => {
-        if (activeBadges.length === 0) {
-          return true;
-        }
-
+        if (activeBadges.length === 0) return true;
         return activeBadges.every((badge) => repository.badges.includes(badge));
       })
       .filter((repository) => {
-        if (!searchQuery.trim()) {
-          return true;
-        }
-
+        if (!searchQuery.trim()) return true;
         const query = searchQuery.toLowerCase();
-
         return (
           repository.name.toLowerCase().includes(query) ||
           repository.namespace.toLowerCase().includes(query) ||
-          repository.description.toLowerCase().includes(query) ||
+          (repository.description ?? "").toLowerCase().includes(query) ||
           repository.tags.some((tag) => tag.toLowerCase().includes(query))
         );
       })
@@ -156,31 +164,41 @@ export default function ExplorePage() {
         (a, b) =>
           computeRelevance(b, searchQuery) - computeRelevance(a, searchQuery)
       );
+  }, [activeBadges, repositories, searchQuery]);
 
-    return results;
-  }, [activeBadges, searchQuery]);
-
-  const selectedRepository = useMemo(() => {
-    const activeSelection = selectedRepositoryId
-      ? repositories.find(
-          (repository) => repository.id === selectedRepositoryId
-        ) ?? null
-      : null;
-
-    return activeSelection ?? filteredRepositories[0] ?? null;
+  useEffect(() => {
+    if (filteredRepositories.length === 0) {
+      setSelectedRepositoryId(null);
+      return;
+    }
+    if (
+      selectedRepositoryId === null ||
+      !filteredRepositories.some((repo) => repo.id === selectedRepositoryId)
+    ) {
+      setSelectedRepositoryId(filteredRepositories[0].id);
+    }
   }, [filteredRepositories, selectedRepositoryId]);
 
-  const handleToggleBadge = (badge: RepositoryBadge) => {
-    setActiveBadges((current) => {
-      if (current.includes(badge)) {
-        return current.filter((item) => item !== badge);
-      }
+  const selectedRepository = useMemo(() => {
+    if (selectedRepositoryId == null) {
+      return filteredRepositories[0] ?? null;
+    }
+    return (
+      repositories.find((repo) => repo.id === selectedRepositoryId) ??
+      filteredRepositories[0] ??
+      null
+    );
+  }, [filteredRepositories, repositories, selectedRepositoryId]);
 
-      return [...current, badge];
-    });
+  const handleToggleBadge = (badge: RepositoryBadge) => {
+    setActiveBadges((current) =>
+      current.includes(badge)
+        ? current.filter((item) => item !== badge)
+        : [...current, badge]
+    );
   };
 
-  const handleSelectRepository = (repositoryId: string) => {
+  const handleSelectRepository = (repositoryId: number) => {
     setSelectedRepositoryId(repositoryId);
   };
 
@@ -238,25 +256,12 @@ export default function ExplorePage() {
                 Search repositories
               </label>
               <div className="flex items-center gap-3 rounded-xl bg-white/10 px-4 py-3">
-                <svg
-                  className="h-5 w-5 text-sky-200"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden
-                >
-                  <path d="m21 21-4.35-4.35"></path>
-                  <circle cx="11" cy="11" r="7"></circle>
-                </svg>
                 <input
                   type="search"
                   value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search by name, tag, or publisher"
-                  className="w-full bg-transparent text-sm text-white placeholder:text-slate-400 focus:outline-none"
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search repositories..."
+                  className="w-full bg-transparent outline-none placeholder-slate-400"
                 />
               </div>
             </div>
@@ -297,8 +302,12 @@ export default function ExplorePage() {
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-12 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-6">
           <div className="flex items-center justify-between text-sm text-slate-300">
-            <span>{filteredRepositories.length} repositories found</span>
-            {searchQuery ? (
+            <span>
+              {isLoading
+                ? "Loading repositories..."
+                : `${filteredRepositories.length} repositories found`}
+            </span>
+            {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
@@ -306,14 +315,21 @@ export default function ExplorePage() {
               >
                 Clear search
               </button>
-            ) : null}
+            )}
           </div>
 
           <ul className="space-y-4">
-            {filteredRepositories.length > 0 ? (
+            {isLoading ? (
+              <li className="rounded-2xl border border-white/10 bg-white/5 px-6 py-10 text-center text-sm text-slate-300">
+                Fetching repositories from the registry...
+              </li>
+            ) : error ? (
+              <li className="rounded-2xl border border-red-500/40 bg-red-500/10 px-6 py-10 text-center text-sm text-red-200">
+                {error}
+              </li>
+            ) : filteredRepositories.length > 0 ? (
               filteredRepositories.map((repository) => {
                 const isSelected = selectedRepository?.id === repository.id;
-
                 return (
                   <li key={repository.id}>
                     <button
@@ -336,39 +352,16 @@ export default function ExplorePage() {
                         </div>
                         <div className="flex items-center gap-3 text-xs text-slate-200">
                           <span className="flex items-center gap-1 rounded-full bg-white/10 px-3 py-1">
-                            <svg
-                              className="h-4 w-4 text-amber-300"
-                              viewBox="0 0 24 24"
-                              fill="currentColor"
-                              aria-hidden
-                            >
-                              <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                            </svg>
-                            {repository.stars.toLocaleString()} stars
+                            ⭐ {repository.stars.toLocaleString()} stars
                           </span>
                           <span className="flex items-center gap-1 rounded-full bg-white/10 px-3 py-1">
-                            <svg
-                              className="h-4 w-4 text-sky-300"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden
-                            >
-                              <path d="M12 5v14" />
-                              <path d="m19 12-7 7-7-7" />
-                            </svg>
-                            {repository.pulls} pulls
+                            ⬇ {formatPulls(repository.pulls)} pulls
                           </span>
                         </div>
                       </div>
-
                       <p className="text-sm text-slate-200/80">
-                        {repository.description}
+                        {repository.description ?? "No description provided."}
                       </p>
-
                       <div className="flex flex-wrap items-center gap-2 text-xs">
                         {repository.badges.map((badge) => (
                           <span
@@ -387,9 +380,8 @@ export default function ExplorePage() {
                           </span>
                         ))}
                       </div>
-
                       <p className="text-xs text-slate-400">
-                        {repository.updatedAt}
+                        {formatUpdatedAt(repository.updatedAt)}
                       </p>
                     </button>
                   </li>
@@ -433,7 +425,8 @@ export default function ExplorePage() {
                     {selectedRepository.namespace}/{selectedRepository.name}
                   </h2>
                   <p className="mt-3 text-sm text-slate-200/80">
-                    {selectedRepository.description}
+                    {selectedRepository.description ??
+                      "No description provided."}
                   </p>
                 </div>
 
@@ -451,7 +444,7 @@ export default function ExplorePage() {
                       Pulls
                     </p>
                     <p className="mt-2 text-lg font-semibold">
-                      {selectedRepository.pulls}
+                      {formatPulls(selectedRepository.pulls)}
                     </p>
                   </div>
                 </div>
@@ -461,14 +454,20 @@ export default function ExplorePage() {
                     Badges
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-100">
-                    {selectedRepository.badges.map((badge) => (
-                      <span
-                        key={badge}
-                        className="rounded-full border border-sky-400/40 bg-sky-500/10 px-3 py-1"
-                      >
-                        {badge}
+                    {selectedRepository.badges.length > 0 ? (
+                      selectedRepository.badges.map((badge) => (
+                        <span
+                          key={badge}
+                          className="rounded-full border border-sky-400/40 bg-sky-500/10 px-3 py-1"
+                        >
+                          {badge}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-slate-300">
+                        No special badges assigned.
                       </span>
-                    ))}
+                    )}
                   </div>
                 </div>
 
@@ -477,19 +476,25 @@ export default function ExplorePage() {
                     Tags
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-100">
-                    {selectedRepository.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full bg-white/10 px-3 py-1"
-                      >
-                        #{tag}
+                    {selectedRepository.tags.length > 0 ? (
+                      selectedRepository.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full bg-white/10 px-3 py-1"
+                        >
+                          #{tag}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-slate-300">
+                        No tags published yet.
                       </span>
-                    ))}
+                    )}
                   </div>
                 </div>
 
                 <p className="text-xs text-slate-400">
-                  {selectedRepository.updatedAt}
+                  {formatUpdatedAt(selectedRepository.updatedAt)}
                 </p>
 
                 <button

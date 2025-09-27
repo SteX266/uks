@@ -16,9 +16,9 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
         for (RoleName rn : RoleName.values()) {
-            roleRepository.findByName(rn).orElseGet(() ->
-                    roleRepository.save(Role.builder().name(rn).build())
-            );
+            //roleRepository.findByName(rn).orElseGet(() ->
+             //       roleRepository.save(Role.builder().name(rn).build())
+          //  );
         }
     }
 }

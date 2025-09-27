@@ -1,6 +1,7 @@
 package com.example.dockerhub_clone.controller;
 
 import com.example.dockerhub_clone.dto.CreateRepositoryRequestDto;
+import com.example.dockerhub_clone.dto.ExploreRepositoryResponseDto;
 import com.example.dockerhub_clone.dto.RepositoryResponseDto;
 import com.example.dockerhub_clone.service.RepositoryService;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,11 @@ public class RepositoryController {
         return ResponseEntity.ok(repositoryService.listMyRepos());
     }
 
+    @GetMapping("/explore")
+    public ResponseEntity<List<ExploreRepositoryResponseDto>> explorePublicRepos() {
+        return ResponseEntity.ok(repositoryService.listPublicRepositoriesForExplore());
+    }
+
     @PreAuthorize("hasRole('USER')")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteRepo(@PathVariable Long id) {
@@ -49,6 +55,4 @@ public class RepositoryController {
     public ResponseEntity<RepositoryResponseDto> makeOfficial(@PathVariable Long id) {
         return ResponseEntity.ok(repositoryService.markAsOfficial(id));
     }
-
-
 }
