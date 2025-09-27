@@ -3,7 +3,7 @@ export const API_BASE_URL = "http://localhost:8080/api";
 interface RequestOptions {
   method?: string;
   body?: unknown;
-  auth?: boolean; // <-- NEW: whether this request should include token
+  auth?: boolean;
 }
 
 async function request<T>(
@@ -91,7 +91,6 @@ export interface ExploreRepository {
   updatedAt: string | null;
 }
 
-// 🔑 Now automatically includes token from localStorage
 export async function fetchExploreRepositories() {
   return request<ExploreRepository[]>("/repositories/explore", {
     method: "GET",
