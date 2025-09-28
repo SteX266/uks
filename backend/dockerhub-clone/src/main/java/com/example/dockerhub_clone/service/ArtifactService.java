@@ -3,10 +3,12 @@ package com.example.dockerhub_clone.service;
 import com.example.dockerhub_clone.dto.ArtifactRequestDto;
 import com.example.dockerhub_clone.dto.ArtifactResponseDto;
 import com.example.dockerhub_clone.model.Artifact;
+import com.example.dockerhub_clone.model.CollaboratorPermission;
 import com.example.dockerhub_clone.model.DockerRepository;
 import com.example.dockerhub_clone.model.User;
 import com.example.dockerhub_clone.repository.ArtifactRepository;
 import com.example.dockerhub_clone.repository.DockerRepositoryRepository;
+import com.example.dockerhub_clone.repository.CollaboratorRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +23,7 @@ public class ArtifactService {
 
     private final ArtifactRepository artifactRepository;
     private final DockerRepositoryRepository repoRepository;
+    private final CollaboratorRepository collaboratorRepository;
     private final AuthService authService;
     private final AuditLogService auditLogService;
 
@@ -29,6 +32,10 @@ public class ArtifactService {
                 .orElseThrow(() -> new RuntimeException("Repository not found"));
 
         User actor = authService.getCurrentUser();
+
+        if (!canWrite(actor, repo)) {
+            throw new RuntimeException("Not authorized");
+        }
 
         Artifact artifact = Artifact.builder()
                 .digest(request.getDigest())
@@ -40,6 +47,11 @@ public class ArtifactService {
 
 
         Artifact saved = artifactRepository.save(artifact);
+
+        Instant now = Instant.now();
+        repo.setLastPushedAt(now);
+        repo.setUpdatedAt(now);
+        repoRepository.save(repo);
 
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("repository", repo.getName());
@@ -56,6 +68,12 @@ public class ArtifactService {
         DockerRepository repo = repoRepository.findById(repoId)
                 .orElseThrow(() -> new RuntimeException("Repository not found"));
 
+        User actor = authService.getCurrentUser();
+
+        if (!(repo.isPublic() || canRead(actor, repo))) {
+            throw new RuntimeException("Not authorized");
+        }
+
         return artifactRepository.findByRepository(repo).stream()
                 .map(this::mapToDto)
                 .toList();
@@ -68,6 +86,24 @@ public class ArtifactService {
                 .size(artifact.getSize())
                 .mediaType(artifact.getMediaType())
                 .repositoryName(artifact.getRepository().getName())
+                .createdAt(artifact.getCreatedAt())
                 .build();
+    }
+
+    private boolean canRead(User user, DockerRepository repo) {
+        return repo.getOwner().equals(user) ||
+                collaboratorRepository.findByRepositoryAndUser(repo, user)
+                        .map(c -> c.getPermission() == CollaboratorPermission.READ
+                                || c.getPermission() == CollaboratorPermission.WRITE
+                                || c.getPermission() == CollaboratorPermission.ADMIN)
+                        .orElse(false);
+    }
+
+    private boolean canWrite(User user, DockerRepository repo) {
+        return repo.getOwner().equals(user) ||
+                collaboratorRepository.findByRepositoryAndUser(repo, user)
+                        .map(c -> c.getPermission() == CollaboratorPermission.WRITE
+                                || c.getPermission() == CollaboratorPermission.ADMIN)
+                        .orElse(false);
     }
 }

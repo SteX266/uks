@@ -122,6 +122,15 @@ export interface RepositoryPayload {
   isPublic: boolean;
 }
 
+export interface RepositoryArtifact {
+  id: number;
+  digest: string;
+  size: number | null;
+  mediaType: string | null;
+  repositoryName: string;
+  createdAt: string | null;
+}
+
 export async function fetchMyRepositories() {
   return request<UserRepository[]>("/repositories/me", {
     method: "GET",
@@ -155,6 +164,43 @@ export async function deleteRepository(id: number) {
 export async function fetchRepositoryTags(repoId: number) {
   return request<RepositoryTag[]>(`/repositories/${repoId}/tags`, {
     method: "GET",
+    auth: true,
+  });
+}
+
+export interface ArtifactPayload {
+  digest: string;
+  size: number | null;
+  mediaType: string | null;
+}
+
+export interface TagPayload {
+  name: string;
+  digest: string;
+}
+
+export async function fetchRepositoryArtifacts(repoId: number) {
+  return request<RepositoryArtifact[]>(`/repositories/${repoId}/artifacts`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function createRepositoryArtifact(
+  repoId: number,
+  payload: ArtifactPayload
+) {
+  return request<RepositoryArtifact>(`/repositories/${repoId}/artifacts`, {
+    method: "POST",
+    body: payload,
+    auth: true,
+  });
+}
+
+export async function createRepositoryTag(repoId: number, payload: TagPayload) {
+  return request<RepositoryTag>(`/repositories/${repoId}/tags`, {
+    method: "POST",
+    body: payload,
     auth: true,
   });
 }

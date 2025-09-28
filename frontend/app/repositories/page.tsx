@@ -3,13 +3,17 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
+  type RepositoryArtifact,
   type RepositoryPayload,
   type RepositoryTag,
   type UserRepository,
   createRepository,
+  createRepositoryArtifact,
+  createRepositoryTag,
   deleteRepository as deleteRepositoryApi,
   deleteRepositoryTag,
   fetchMyRepositories,
+  fetchRepositoryArtifacts,
   fetchRepositoryTags,
   updateRepository,
 } from "../lib/api";
@@ -21,6 +25,9 @@ type RepositoryFormValues = {
   description: string;
   visibility: VisibilityOption;
 };
+
+const DEFAULT_MEDIA_TYPE =
+  "application/vnd.docker.distribution.manifest.v2+json";
 
 function classNames(
   ...values: Array<string | false | null | undefined>
@@ -43,6 +50,45 @@ function formatDate(value: string | null) {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return "Unknown";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function formatBytes(size: number | null | undefined) {
+  if (size == null || Number.isNaN(size)) {
+    return "Unknown";
+  }
+
+  if (size <= 0) {
+    return "0 B";
+  }
+
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const base = 1024;
+  const exponent = Math.min(
+    Math.floor(Math.log(size) / Math.log(base)),
+    units.length - 1
+  );
+  const value = size / base ** exponent;
+
+  return `${value.toFixed(exponent === 0 ? 0 : 2)} ${units[exponent]}`;
 }
 
 function sanitizePayload(values: RepositoryFormValues): RepositoryPayload {
@@ -83,6 +129,17 @@ export default function RepositoriesPage() {
   const [tagLoading, setTagLoading] = useState(false);
   const [tagError, setTagError] = useState<string | null>(null);
   const [tagDeletePending, setTagDeletePending] = useState<string | null>(null);
+  const [artifactsByRepository, setArtifactsByRepository] = useState<
+    Record<number, RepositoryArtifact[]>
+  >({});
+  const [artifactLoading, setArtifactLoading] = useState(false);
+  const [artifactError, setArtifactError] = useState<string | null>(null);
+  const [pushTagName, setPushTagName] = useState("");
+  const [pushDigest, setPushDigest] = useState("");
+  const [pushSize, setPushSize] = useState("");
+  const [pushMediaType, setPushMediaType] = useState(DEFAULT_MEDIA_TYPE);
+  const [pushError, setPushError] = useState<string | null>(null);
+  const [isPushing, setIsPushing] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -174,21 +231,27 @@ export default function RepositoriesPage() {
 
   useEffect(() => {
     if (selectedRepositoryId == null) {
+      setTagLoading(false);
+      setArtifactLoading(false);
       return;
     }
 
+    const repoId = selectedRepositoryId;
+
     setTagLoading(true);
+    setArtifactLoading(true);
     setTagError(null);
+    setArtifactError(null);
     setTagSearch("");
 
     let isMounted = true;
 
-    fetchRepositoryTags(selectedRepositoryId)
+    fetchRepositoryTags(repoId)
       .then((data) => {
         if (!isMounted) return;
         setTagsByRepository((prev) => ({
           ...prev,
-          [selectedRepositoryId]: data,
+          [repoId]: data,
         }));
       })
       .catch((err: unknown) => {
@@ -198,12 +261,36 @@ export default function RepositoriesPage() {
         setTagError(message);
         setTagsByRepository((prev) => ({
           ...prev,
-          [selectedRepositoryId]: [],
+          [repoId]: [],
         }));
       })
       .finally(() => {
         if (isMounted) {
           setTagLoading(false);
+        }
+      });
+
+    fetchRepositoryArtifacts(repoId)
+      .then((data) => {
+        if (!isMounted) return;
+        setArtifactsByRepository((prev) => ({
+          ...prev,
+          [repoId]: data,
+        }));
+      })
+      .catch((err: unknown) => {
+        if (!isMounted) return;
+        const message =
+          err instanceof Error ? err.message : "Failed to load artifacts.";
+        setArtifactError(message);
+        setArtifactsByRepository((prev) => ({
+          ...prev,
+          [repoId]: [],
+        }));
+      })
+      .finally(() => {
+        if (isMounted) {
+          setArtifactLoading(false);
         }
       });
 
@@ -217,6 +304,15 @@ export default function RepositoriesPage() {
       setUpdateError(null);
     }
   }, [editMode]);
+
+  useEffect(() => {
+    setPushError(null);
+    setIsPushing(false);
+    setPushTagName("");
+    setPushDigest("");
+    setPushSize("");
+    setPushMediaType(DEFAULT_MEDIA_TYPE);
+  }, [selectedRepositoryId]);
 
   const filteredTags = useMemo(() => {
     if (!selectedRepository) {
@@ -239,10 +335,20 @@ export default function RepositoriesPage() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [selectedRepository, tagSearch, tagsByRepository]);
 
+  const repositoryArtifacts = useMemo(() => {
+    if (!selectedRepository) {
+      return [];
+    }
+
+    return artifactsByRepository[selectedRepository.id] ?? [];
+  }, [artifactsByRepository, selectedRepository]);
+
   const handleSelectRepository = (repositoryId: number) => {
     setSelectedRepositoryId(repositoryId);
     setEditMode(false);
     setTagError(null);
+    setArtifactError(null);
+    setPushError(null);
   };
 
   const handleCreateRepository = async (values: RepositoryFormValues) => {
@@ -259,6 +365,10 @@ export default function RepositoriesPage() {
       setRepositories((current) => [created, ...current]);
       setSelectedRepositoryId(created.id);
       setTagsByRepository((current) => ({
+        ...current,
+        [created.id]: [],
+      }));
+      setArtifactsByRepository((current) => ({
         ...current,
         [created.id]: [],
       }));
@@ -318,6 +428,12 @@ export default function RepositoriesPage() {
         delete updated[pendingDeleteId];
         return updated;
       });
+
+      setArtifactsByRepository((current) => {
+        const updated = { ...current };
+        delete updated[pendingDeleteId];
+        return updated;
+      });
       setPendingDeleteId(null);
       setEditMode(false);
     } catch (err) {
@@ -351,6 +467,93 @@ export default function RepositoriesPage() {
       setTagError(message);
     } finally {
       setTagDeletePending(null);
+    }
+  };
+
+  const handleDockerPush = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!selectedRepository) {
+      return;
+    }
+
+    const tagName = pushTagName.trim();
+    const digest = pushDigest.trim();
+    const sizeInput = pushSize.trim();
+    const mediaTypeInput = pushMediaType.trim();
+
+    if (!tagName) {
+      setPushError("Tag name is required.");
+      return;
+    }
+
+    if (!digest) {
+      setPushError("Digest is required.");
+      return;
+    }
+
+    let sizeValue: number | null = null;
+    if (sizeInput) {
+      const parsed = Number(sizeInput);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        setPushError("Image size must be zero or a positive number.");
+        return;
+      }
+      sizeValue = Math.round(parsed);
+    }
+
+    setIsPushing(true);
+    setPushError(null);
+
+    try {
+      const repoId = selectedRepository.id;
+      const existingArtifacts = artifactsByRepository[repoId] ?? [];
+      const alreadyCreated = existingArtifacts.some(
+        (artifact) => artifact.digest === digest
+      );
+
+      if (!alreadyCreated) {
+        const createdArtifact = await createRepositoryArtifact(repoId, {
+          digest,
+          size: sizeValue,
+          mediaType: mediaTypeInput.length > 0 ? mediaTypeInput : null,
+        });
+
+        setArtifactsByRepository((prev) => ({
+          ...prev,
+          [repoId]: [createdArtifact, ...(prev[repoId] ?? [])],
+        }));
+      }
+
+      const createdTag = await createRepositoryTag(repoId, {
+        name: tagName,
+        digest,
+      });
+
+      setTagsByRepository((prev) => {
+        const existing = prev[repoId] ?? [];
+        const withoutDuplicate = existing.filter(
+          (tag) => tag.name !== createdTag.name
+        );
+        return {
+          ...prev,
+          [repoId]: [createdTag, ...withoutDuplicate],
+        };
+      });
+
+      setPushTagName("");
+      setPushDigest("");
+      setPushSize("");
+      setPushMediaType(
+        mediaTypeInput.length > 0 ? mediaTypeInput : DEFAULT_MEDIA_TYPE
+      );
+      setPushError(null);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to push image.";
+      setPushError(message);
+    } finally {
+      setIsPushing(false);
     }
   };
 
@@ -595,6 +798,149 @@ export default function RepositoriesPage() {
                       error={updateError}
                     />
                   ) : null}
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+                  <div className="space-y-2">
+                    <p className="text-xs uppercase tracking-[0.3em] text-sky-200">
+                      Docker push
+                    </p>
+                    <h4 className="text-lg font-semibold text-white">
+                      Simulate a docker push
+                    </h4>
+                    <p className="text-xs text-slate-300/70">
+                      Provide manifest information to create an artifact and tag
+                      as if you pushed an image with <code>docker push</code>.
+                    </p>
+                  </div>
+
+                  <form
+                    onSubmit={handleDockerPush}
+                    className="mt-6 space-y-4 text-xs"
+                  >
+                    <div className="space-y-2">
+                      <label className="uppercase tracking-wide text-slate-400">
+                        Tag name
+                      </label>
+                      <input
+                        value={pushTagName}
+                        onChange={(event) => setPushTagName(event.target.value)}
+                        required
+                        placeholder="latest"
+                        className="w-full rounded-lg border border-white/10 bg-slate-950/40 px-3 py-2 text-sm outline-none transition focus:border-sky-400"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="uppercase tracking-wide text-slate-400">
+                        Digest
+                      </label>
+                      <input
+                        value={pushDigest}
+                        onChange={(event) => setPushDigest(event.target.value)}
+                        required
+                        placeholder="sha256:..."
+                        className="w-full rounded-lg border border-white/10 bg-slate-950/40 px-3 py-2 text-sm font-mono outline-none transition focus:border-sky-400"
+                      />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <label className="uppercase tracking-wide text-slate-400">
+                          Image size (bytes)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={pushSize}
+                          onChange={(event) => setPushSize(event.target.value)}
+                          placeholder="e.g. 458752"
+                          className="w-full rounded-lg border border-white/10 bg-slate-950/40 px-3 py-2 text-sm outline-none transition focus:border-sky-400"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="uppercase tracking-wide text-slate-400">
+                          Media type
+                        </label>
+                        <input
+                          value={pushMediaType}
+                          onChange={(event) =>
+                            setPushMediaType(event.target.value)
+                          }
+                          className="w-full rounded-lg border border-white/10 bg-slate-950/40 px-3 py-2 text-sm outline-none transition focus:border-sky-400"
+                        />
+                      </div>
+                    </div>
+                    {pushError ? (
+                      <div className="rounded-lg border border-rose-500/40 bg-rose-950/30 px-3 py-2 text-[11px] text-rose-200">
+                        {pushError}
+                      </div>
+                    ) : null}
+                    <button
+                      type="submit"
+                      disabled={isPushing}
+                      className="w-full rounded-full bg-sky-500 px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-white transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isPushing ? "Pushing..." : "Push image"}
+                    </button>
+                  </form>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+                  <div className="space-y-2">
+                    <p className="text-xs uppercase tracking-[0.3em] text-sky-200">
+                      Artifacts
+                    </p>
+                    <h4 className="text-lg font-semibold text-white">
+                      {artifactLoading
+                        ? "Loading artifacts..."
+                        : `${repositoryArtifacts.length} artifacts`}
+                    </h4>
+                    <p className="text-xs text-slate-300/70">
+                      Artifacts represent image manifests associated with this
+                      repository. They are populated whenever you simulate a
+                      push.
+                    </p>
+                  </div>
+
+                  <div className="mt-6 space-y-3">
+                    {artifactError ? (
+                      <div className="rounded-xl border border-rose-500/40 bg-rose-950/30 px-4 py-3 text-xs text-rose-200">
+                        {artifactError}
+                      </div>
+                    ) : null}
+                    {!artifactLoading && repositoryArtifacts.length === 0 ? (
+                      <div className="rounded-xl border border-white/10 bg-slate-950/40 px-4 py-4 text-xs text-slate-300/70">
+                        No artifacts have been pushed yet.
+                      </div>
+                    ) : null}
+                    {artifactLoading ? (
+                      <div className="rounded-xl border border-white/10 bg-slate-950/40 px-4 py-4 text-xs text-slate-300/60">
+                        Fetching artifacts...
+                      </div>
+                    ) : (
+                      repositoryArtifacts.map((artifact) => (
+                        <div
+                          key={artifact.id ?? artifact.digest}
+                          className="rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-xs text-slate-200"
+                        >
+                          <p className="font-mono text-sm text-white">
+                            {artifact.digest}
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-3 text-[11px] uppercase tracking-wide text-slate-300/70">
+                            <span className="rounded-full border border-white/10 bg-slate-900/60 px-2 py-1">
+                              Size: {formatBytes(artifact.size)}
+                            </span>
+                            <span className="rounded-full border border-white/10 bg-slate-900/60 px-2 py-1">
+                              Media: {artifact.mediaType ?? "unknown"}
+                            </span>
+                            <span className="rounded-full border border-white/10 bg-slate-900/60 px-2 py-1">
+                              Pushed {formatDateTime(artifact.createdAt)}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur">
