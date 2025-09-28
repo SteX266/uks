@@ -19,11 +19,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.Comparator;
-import java.util.EnumSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,6 +31,8 @@ public class AdminUserService {
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditLogService auditLogService;
+    private final AuthService authService;
 
     @Transactional
     public AdminUserResponseDto createAdminUser(CreateAdminRequestDto request) {
@@ -70,6 +68,13 @@ public class AdminUserService {
         user.getRoles().add(userRole);
 
         long repositoryCount = dockerRepositoryRepository.countByOwner(user);
+        User actor = authService.getCurrentUser();
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("username", user.getUsername());
+        metadata.put("email", user.getEmail());
+        metadata.put("displayName", user.getDisplayName());
+
+        auditLogService.recordAction(actor, "ADMIN_USER_CREATE", "USER", user.getId().toString(), metadata);
         return mapToDto(user, repositoryCount);
     }
 
@@ -119,6 +124,14 @@ public class AdminUserService {
         user = userRepository.save(user);
 
         long repositoryCount = dockerRepositoryRepository.countByOwner(user);
+        User actor = authService.getCurrentUser();
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("username", user.getUsername());
+        metadata.put("email", user.getEmail());
+        metadata.put("active", user.isActive());
+        metadata.put("badges", user.getBadges().stream().map(UserBadge::getLabel).toList());
+
+        auditLogService.recordAction(actor, "ADMIN_USER_UPDATE", "USER", user.getId().toString(), metadata);
         return mapToDto(user, repositoryCount);
     }
 
@@ -126,6 +139,12 @@ public class AdminUserService {
     public void deleteUser(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        User actor = authService.getCurrentUser();
+        Map<String, Object> metadata = Map.of(
+                "username", user.getUsername(),
+                "email", user.getEmail()
+        );
+        auditLogService.recordAction(actor, "ADMIN_USER_DELETE", "USER", user.getId().toString(), metadata);
         userRepository.delete(user);
     }
 

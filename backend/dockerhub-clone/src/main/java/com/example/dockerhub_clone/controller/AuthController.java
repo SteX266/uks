@@ -8,6 +8,7 @@ import com.example.dockerhub_clone.repository.RoleRepository;
 import com.example.dockerhub_clone.repository.UserRepository;
 import com.example.dockerhub_clone.repository.UserRoleRepository;
 import com.example.dockerhub_clone.security.JwtUtil;
+import com.example.dockerhub_clone.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -25,6 +26,7 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
+    private final AuditLogService auditLogService;
 
     @PostMapping("/register")
     public Map<String, String> register(@RequestBody Map<String, String> body) {
@@ -52,6 +54,11 @@ public class AuthController {
                 .role(userRole)
                 .build());
 
+        auditLogService.recordAction(user, "USER_REGISTER", "USER", user.getId().toString(), Map.of(
+                "email", user.getEmail(),
+                "username", user.getUsername()
+        ));
+
         return Map.of("message", "User registered successfully");
     }
 
@@ -71,6 +78,10 @@ public class AuthController {
         userRepository.save(user);
 
         String token = jwtUtil.generateToken(username);
+
+        auditLogService.recordAction(user, "USER_LOGIN", "USER", user.getId().toString(), Map.of(
+                "loginAt", user.getUpdatedAt().toString()
+        ));
         return Map.of("token", token);
     }
 }

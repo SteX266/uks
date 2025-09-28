@@ -14,7 +14,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +27,7 @@ public class TagService {
     private final DockerRepositoryRepository repoRepository;
     private final CollaboratorRepository collaboratorRepository;
     private final AuthService authService;
+    private final AuditLogService auditLogService;
 
     // --- Core functionality ---
 
@@ -46,7 +49,16 @@ public class TagService {
                 .createdAt(Instant.now())
                 .build();
 
-        return mapToDto(tagRepository.save(tag));
+        Tag saved = tagRepository.save(tag);
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("repository", repo.getName());
+        metadata.put("tag", saved.getName());
+        metadata.put("artifactDigest", artifact.getDigest());
+
+        auditLogService.recordAction(current, "TAG_CREATE", "TAG", saved.getId().toString(), metadata);
+
+        return mapToDto(saved);
     }
 
     public void deleteTag(Long repoId, String tagName) {
@@ -59,6 +71,13 @@ public class TagService {
 
         Tag tag = tagRepository.findByRepositoryAndName(repo, tagName)
                 .orElseThrow(() -> new RuntimeException("Tag not found"));
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("repository", repo.getName());
+        metadata.put("tag", tag.getName());
+        metadata.put("artifactDigest", tag.getArtifact().getDigest());
+
+        auditLogService.recordAction(current, "TAG_DELETE", "TAG", tag.getId().toString(), metadata);
 
         tagRepository.delete(tag);
     }
@@ -74,10 +93,22 @@ public class TagService {
         Tag tag = tagRepository.findByRepositoryAndName(repo, oldTagName)
                 .orElseThrow(() -> new RuntimeException("Tag not found"));
 
+        String oldName = tag.getName();
+
         tag.setName(newTagName);
         tag.setCreatedAt(Instant.now());
 
-        return mapToDto(tagRepository.save(tag));
+        Tag saved = tagRepository.save(tag);
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("repository", repo.getName());
+        metadata.put("from", oldName);
+        metadata.put("to", saved.getName());
+        metadata.put("artifactDigest", saved.getArtifact().getDigest());
+
+        auditLogService.recordAction(current, "TAG_RENAME", "TAG", saved.getId().toString(), metadata);
+
+        return mapToDto(saved);
     }
 
     public List<TagResponseDto> listTags(Long repoId) {
