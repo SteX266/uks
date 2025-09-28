@@ -376,15 +376,13 @@ export default function AdminUsersPage() {
 
       setStatus({
         kind: "success",
-        text: `Deleted ${
-          target.displayName ?? target.username
-        } from the directory.`,
+        text: `Deactivated ${target.displayName ?? target.username}.`,
       });
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : "Unable to delete the selected user.";
+          : "Unable to deactivate the selected user.";
       setStatus({ kind: "error", text: message });
     } finally {
       setIsDeletingUserId(null);
@@ -758,12 +756,6 @@ export default function AdminUsersPage() {
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-2 text-sm">
-                        <Link
-                          href={`/profile?user=${user.username}`}
-                          className="rounded-full border border-indigo-400/40 px-4 py-2 font-semibold text-indigo-300 transition hover:border-indigo-400 hover:text-white"
-                        >
-                          View profile
-                        </Link>
                         <button
                           type="button"
                           onClick={() => handleEditClick(user)}
@@ -774,19 +766,16 @@ export default function AdminUsersPage() {
                         <button
                           type="button"
                           onClick={() => handleDeleteUser(user.id)}
-                          disabled={isDeletingUserId === user.id}
+                          disabled={
+                            isDeletingUserId === user.id || !user.active
+                          }
                           className="rounded-full border border-rose-500/40 px-4 py-2 font-semibold text-rose-200 transition hover:border-rose-400 hover:text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {isDeletingUserId === user.id
-                            ? "Deleting..."
-                            : "Delete"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleFocusBadges(user.id)}
-                          className="rounded-full border border-emerald-500/30 px-4 py-2 font-semibold text-emerald-200 transition hover:border-emerald-400 hover:text-white"
-                        >
-                          Manage badges
+                            ? "Deactivating..."
+                            : user.active
+                            ? "Deactivate"
+                            : "Deactivated"}
                         </button>
                       </div>
                     </div>

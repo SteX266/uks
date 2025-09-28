@@ -136,16 +136,26 @@ public class AdminUserService {
     }
 
     @Transactional
-    public void deleteUser(Long userId) {
+    public AdminUserResponseDto deleteUser(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        if (!user.isActive()) {
+            return mapToDto(user, dockerRepositoryRepository.countByOwner(user));
+        }
+
+        user.setActive(false);
+        user.setUpdatedAt(Instant.now());
+        user = userRepository.save(user);
+
+        long repositoryCount = dockerRepositoryRepository.countByOwner(user);
         User actor = authService.getCurrentUser();
-        Map<String, Object> metadata = Map.of(
-                "username", user.getUsername(),
-                "email", user.getEmail()
-        );
-        auditLogService.recordAction(actor, "ADMIN_USER_DELETE", "USER", user.getId().toString(), metadata);
-        userRepository.delete(user);
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("username", user.getUsername());
+        metadata.put("email", user.getEmail());
+        metadata.put("active", user.isActive());
+        metadata.put("repositoryCount", repositoryCount);
+        auditLogService.recordAction(actor, "ADMIN_USER_DEACTIVATE", "USER", user.getId().toString(), metadata);
+        return mapToDto(user, repositoryCount);
     }
 
     @Transactional(readOnly = true)
