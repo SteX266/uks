@@ -257,8 +257,8 @@ export default function AnalyticsPage() {
                 </code>
                 . Example:{" "}
                 <code className="rounded bg-slate-800 px-2 py-0.5 text-xs">
-                  (level == "ERROR" OR level == "WARN") AND message CONTAINS
-                  "timeout"
+                  (level == &quot;ERROR&quot; OR level == &quot;WARN&quot;) AND
+                  message CONTAINS &quot;timeout&quot;
                 </code>
               </p>
             </div>
@@ -401,7 +401,9 @@ export default function AnalyticsPage() {
                   <select
                     value={timestampOperator}
                     onChange={(event) =>
-                      setTimestampOperator(event.target.value as TimestampOperator)
+                      setTimestampOperator(
+                        event.target.value as TimestampOperator
+                      )
                     }
                     className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs uppercase text-slate-200 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                   >
@@ -452,7 +454,9 @@ export default function AnalyticsPage() {
                 <button
                   type="button"
                   disabled={
-                    isSearching || page >= totalPages - 1 || results.length === 0
+                    isSearching ||
+                    page >= totalPages - 1 ||
+                    results.length === 0
                   }
                   onClick={() => executeSearch(page + 1)}
                   className="rounded-full border border-slate-700 px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-200 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
