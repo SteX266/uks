@@ -81,7 +81,9 @@ public class AuthController {
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new RuntimeException("Invalid credentials");
         }
-
+        if (!user.isActive()) {
+            throw new RuntimeException("Account is deactivated");
+        }
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
 

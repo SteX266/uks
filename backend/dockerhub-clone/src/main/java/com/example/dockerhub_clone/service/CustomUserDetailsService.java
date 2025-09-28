@@ -3,6 +3,7 @@ package com.example.dockerhub_clone.service;
 import com.example.dockerhub_clone.model.User;
 import com.example.dockerhub_clone.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -23,6 +24,10 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        if (!user.isActive()) {
+            throw new DisabledException("User account is deactivated");
+        }
 
         List<GrantedAuthority> authorities = user.getRoles().stream()
                 .map(ur -> new SimpleGrantedAuthority(ur.getRole().getName().name()))
