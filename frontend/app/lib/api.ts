@@ -301,3 +301,35 @@ export async function createAdminUser(payload: CreateAdminUserPayload) {
     auth: true,
   });
 }
+
+export interface AnalyticsQueryPayload {
+  query: string;
+  from?: number;
+  size?: number;
+}
+
+export interface LogSearchHit {
+  id: string | null;
+  score: number | null;
+  timestamp: string | null;
+  level: string | null;
+  message: string | null;
+  raw: string | null;
+  source: string | null;
+  highlight: string | null;
+}
+
+export interface LogSearchResponse {
+  total: number;
+  took: number;
+  translatedQuery: string;
+  hits: LogSearchHit[];
+}
+
+export async function searchSystemLogs(payload: AnalyticsQueryPayload) {
+  return request<LogSearchResponse>("/admin/analytics/search", {
+    method: "POST",
+    body: payload,
+    auth: true,
+  });
+}
