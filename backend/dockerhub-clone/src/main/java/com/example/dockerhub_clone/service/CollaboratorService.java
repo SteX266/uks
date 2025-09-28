@@ -9,7 +9,9 @@ import com.example.dockerhub_clone.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +21,7 @@ public class CollaboratorService {
     private final DockerRepositoryRepository repoRepository;
     private final UserRepository userRepository;
     private final AuthService authService;
+    private final AuditLogService auditLogService;
 
     public void addCollaborator(Long repoId, AddCollaboratorRequestDto request) {
         User currentUser = authService.getCurrentUser();
@@ -39,6 +42,14 @@ public class CollaboratorService {
                 .permission(request.getPermission())
                 .build();
 
+        Collaborator saved = collaboratorRepository.save(collaborator);
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("repository", repo.getName());
+        metadata.put("collaborator", collaboratorUser.getUsername());
+        metadata.put("permission", collaborator.getPermission().name());
+
+        auditLogService.recordAction(currentUser, "COLLABORATOR_ADD", "COLLABORATOR", saved.getId().toString(), metadata);
         collaboratorRepository.save(collaborator);
     }
 
@@ -59,6 +70,12 @@ public class CollaboratorService {
                 .findByRepositoryAndUser(repo, collaboratorUser)
                 .orElseThrow(() -> new RuntimeException("Collaborator not found"));
 
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("repository", repo.getName());
+        metadata.put("collaborator", collaboratorUser.getUsername());
+        metadata.put("permission", collaborator.getPermission().name());
+
+        auditLogService.recordAction(currentUser, "COLLABORATOR_REMOVE", "COLLABORATOR", collaborator.getId().toString(), metadata);
         collaboratorRepository.delete(collaborator);
     }
 

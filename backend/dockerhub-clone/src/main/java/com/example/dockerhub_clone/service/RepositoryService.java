@@ -9,10 +9,13 @@ import com.example.dockerhub_clone.repository.DockerRepositoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -22,6 +25,7 @@ public class RepositoryService {
     private final DockerRepositoryRepository repoRepository;
     private final CollaboratorRepository collaboratorRepository;
     private final AuthService authService;
+    private final AuditLogService auditLogService;
 
     /**
      * Owner creates a new repository.
@@ -44,7 +48,18 @@ public class RepositoryService {
                 .isOfficial(false)
                 .build();
 
-        return mapToDto(repoRepository.save(repo));
+        DockerRepository saved = repoRepository.save(repo);
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("name", saved.getName());
+        metadata.put("public", saved.isPublic());
+        if (StringUtils.hasText(saved.getDescription())) {
+            metadata.put("description", saved.getDescription());
+        }
+
+        auditLogService.recordAction(currentUser, "REPOSITORY_CREATE", "REPOSITORY", saved.getId().toString(), metadata);
+
+        return mapToDto(saved);
     }
 
     /**
@@ -66,7 +81,18 @@ public class RepositoryService {
         repo.setPublic(request.isPublic());
         repo.setUpdatedAt(Instant.now());
 
-        return mapToDto(repoRepository.save(repo));
+        DockerRepository saved = repoRepository.save(repo);
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("name", saved.getName());
+        metadata.put("public", saved.isPublic());
+        if (StringUtils.hasText(saved.getDescription())) {
+            metadata.put("description", saved.getDescription());
+        }
+
+        auditLogService.recordAction(currentUser, "REPOSITORY_UPDATE", "REPOSITORY", saved.getId().toString(), metadata);
+
+        return mapToDto(saved);
     }
 
     /**
@@ -79,6 +105,12 @@ public class RepositoryService {
         if (!canAdmin(currentUser, repo)) {
             throw new RuntimeException("Not authorized to delete this repository");
         }
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("name", repo.getName());
+        metadata.put("public", repo.isPublic());
+
+        auditLogService.recordAction(currentUser, "REPOSITORY_DELETE", "REPOSITORY", repo.getId().toString(), metadata);
 
         repoRepository.delete(repo);
     }
@@ -105,7 +137,13 @@ public class RepositoryService {
         DockerRepository repo = findRepo(repoId);
         repo.setOfficial(true);
         repo.setUpdatedAt(Instant.now());
-        return mapToDto(repoRepository.save(repo));
+
+        DockerRepository saved = repoRepository.save(repo);
+
+        auditLogService.recordAction(authService.getCurrentUser(), "REPOSITORY_MARK_OFFICIAL", "REPOSITORY", saved.getId().toString(),
+                Map.of("name", saved.getName()));
+
+        return mapToDto(saved);
     }
 
     /**

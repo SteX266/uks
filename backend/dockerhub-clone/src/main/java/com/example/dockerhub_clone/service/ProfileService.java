@@ -23,12 +23,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -47,6 +42,7 @@ public class ProfileService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
+    private final AuditLogService auditLogService;
 
     public ProfileResponseDto getProfile() {
         User user = authService.getCurrentUser();
@@ -81,6 +77,18 @@ public class ProfileService {
 
         userRepository.save(user);
 
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("displayName", user.getDisplayName());
+        metadata.put("email", user.getEmail());
+        if (StringUtils.hasText(user.getBio())) {
+            metadata.put("bioUpdated", true);
+        }
+        if (StringUtils.hasText(user.getAvatarUrl())) {
+            metadata.put("avatarUrl", user.getAvatarUrl());
+        }
+
+        auditLogService.recordAction(user, "PROFILE_UPDATE", "USER", user.getId().toString(), metadata);
+
         return buildProfileResponse(user);
     }
 
@@ -109,6 +117,8 @@ public class ProfileService {
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
+
+        auditLogService.recordAction(user, "PASSWORD_CHANGE", "USER", user.getId().toString(), Map.of("passwordChanged", true));
     }
 
     private ProfileResponseDto buildProfileResponse(User user) {
