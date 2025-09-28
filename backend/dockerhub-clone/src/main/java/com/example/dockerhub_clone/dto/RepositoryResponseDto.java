@@ -1,5 +1,6 @@
 package com.example.dockerhub_clone.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,7 +16,9 @@ public class RepositoryResponseDto {
     private Long id;
     private String name;
     private String description;
+    @JsonProperty("isPublic")
     private boolean isPublic;
+    @JsonProperty("isOfficial")
     private boolean isOfficial;
     private String ownerUsername;
     private Instant createdAt;
