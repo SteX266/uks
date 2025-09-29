@@ -2,9 +2,10 @@ package com.example.dockerhub_clone.service;
 
 import com.example.dockerhub_clone.dto.TagRequestDto;
 import com.example.dockerhub_clone.dto.TagResponseDto;
+import com.example.dockerhub_clone.model.Artifact;
+import com.example.dockerhub_clone.model.CollaboratorPermission;
 import com.example.dockerhub_clone.model.DockerRepository;
 import com.example.dockerhub_clone.model.Tag;
-import com.example.dockerhub_clone.model.Artifact;
 import com.example.dockerhub_clone.model.User;
 import com.example.dockerhub_clone.repository.TagRepository;
 import com.example.dockerhub_clone.repository.ArtifactRepository;
@@ -42,11 +43,16 @@ public class TagService {
         Artifact artifact = artifactRepository.findByDigest(request.getDigest())
                 .orElseThrow(() -> new RuntimeException("Artifact not found"));
 
+        if (!artifact.getRepository().getId().equals(repo.getId())) {
+            throw new RuntimeException("Artifact does not belong to repository");
+        }
+
         Tag tag = Tag.builder()
                 .name(request.getName())
                 .artifact(artifact)
                 .repository(repo)
                 .createdAt(Instant.now())
+                .updatedAt(Instant.now())
                 .build();
 
         Tag saved = tagRepository.save(tag);
@@ -96,7 +102,7 @@ public class TagService {
         String oldName = tag.getName();
 
         tag.setName(newTagName);
-        tag.setCreatedAt(Instant.now());
+        tag.setUpdatedAt(Instant.now());
 
         Tag saved = tagRepository.save(tag);
 
@@ -132,18 +138,27 @@ public class TagService {
     }
 
     private boolean canRead(User user, DockerRepository repo) {
-        // TODO: implement same logic as in RepositoryService
-        return true;
+        return repo.getOwner().equals(user) ||
+                collaboratorRepository.findByRepositoryAndUser(repo, user)
+                        .map(c -> c.getPermission() == CollaboratorPermission.READ
+                                || c.getPermission() == CollaboratorPermission.WRITE
+                                || c.getPermission() == CollaboratorPermission.ADMIN)
+                        .orElse(false);
     }
 
     private boolean canWrite(User user, DockerRepository repo) {
-        // TODO: implement same logic as in RepositoryService
-        return true;
+        return repo.getOwner().equals(user) ||
+                collaboratorRepository.findByRepositoryAndUser(repo, user)
+                        .map(c -> c.getPermission() == CollaboratorPermission.WRITE
+                                || c.getPermission() == CollaboratorPermission.ADMIN)
+                        .orElse(false);
     }
 
     private boolean canAdmin(User user, DockerRepository repo) {
-        // TODO: implement same logic as in RepositoryService
-        return true;
+        return repo.getOwner().equals(user) ||
+                collaboratorRepository.findByRepositoryAndUser(repo, user)
+                        .map(c -> c.getPermission() == CollaboratorPermission.ADMIN)
+                        .orElse(false);
     }
 
     private TagResponseDto mapToDto(Tag tag) {
