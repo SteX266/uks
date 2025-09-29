@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   type RepositoryArtifact,
@@ -103,6 +105,7 @@ function sanitizePayload(values: RepositoryFormValues): RepositoryPayload {
 }
 
 export default function RepositoriesPage() {
+  const router = useRouter();
   const [repositories, setRepositories] = useState<UserRepository[]>([]);
   const [selectedRepositoryId, setSelectedRepositoryId] = useState<
     number | null
@@ -182,6 +185,12 @@ export default function RepositoriesPage() {
       return repositories[0]?.id ?? null;
     });
   }, [repositories]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("username");
+    router.push("/login");
+  };
 
   const filteredRepositories = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -580,15 +589,19 @@ export default function RepositoriesPage() {
                 <p className="text-sm uppercase tracking-[0.4em] text-sky-200">
                   DockerHub Clone
                 </p>
-                <p className="text-base font-semibold text-white">
-                  Repositories
-                </p>
+                <p className="text-base font-semibold text-white">Profile</p>
               </div>
             </Link>
             <nav className="flex items-center gap-3 text-sm font-semibold uppercase tracking-wide text-slate-100">
               <Link
                 href="/dashboard"
                 className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+              >
+                Dashboard
+              </Link>
+              <Link
+                href="/repositories"
+                className="rounded-full bg-white/10 px-4 py-2 text-white transition hover:bg-white/20"
               >
                 Repositories
               </Link>
@@ -604,6 +617,12 @@ export default function RepositoriesPage() {
               >
                 Profile
               </Link>
+              <button
+                onClick={handleLogout}
+                className="rounded-full bg-sky-500 px-4 py-2 font-semibold uppercase tracking-wide text-sm text-white transition hover:bg-sky-400"
+              >
+                Log out
+              </button>
             </nav>
           </div>
         </div>

@@ -29,30 +29,54 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       <header className="border-b border-white/10 bg-slate-950/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500 text-lg font-semibold">
-              DH
-            </div>
-            <div>
-              <p className="text-sm uppercase tracking-[0.4em] text-sky-200">
-                DockerHub Clone
-              </p>
-              <h1 className="text-xl font-semibold">
-                Developer control center
-              </h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 text-sm">
-            <span className="hidden rounded-full bg-white/5 px-4 py-2 text-slate-100 md:inline-flex">
-              {username ?? "Loading..."}
-            </span>
-            <button
-              onClick={handleLogout}
-              className="rounded-full bg-sky-500 px-4 py-2 font-semibold uppercase tracking-wide text-sm text-white transition hover:bg-sky-400"
+        <div className="border-b border-white/10">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-3 text-left"
             >
-              Log out
-            </button>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500 text-lg font-semibold">
+                DH
+              </div>
+              <div>
+                <p className="text-sm uppercase tracking-[0.4em] text-sky-200">
+                  DockerHub Clone
+                </p>
+                <p className="text-base font-semibold text-white">Profile</p>
+              </div>
+            </Link>
+            <nav className="flex items-center gap-3 text-sm font-semibold uppercase tracking-wide text-slate-100">
+              <Link
+                href="/dashboard"
+                className="rounded-full bg-white/10 px-4 py-2 text-white transition hover:bg-white/20"
+              >
+                Dashboard
+              </Link>
+              <Link
+                href="/repositories"
+                className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+              >
+                Repositories
+              </Link>
+              <Link
+                href="/explore"
+                className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+              >
+                Explore
+              </Link>
+              <Link
+                href="/profile"
+                className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+              >
+                Profile
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="rounded-full bg-sky-500 px-4 py-2 font-semibold uppercase tracking-wide text-sm text-white transition hover:bg-sky-400"
+              >
+                Log out
+              </button>
+            </nav>
           </div>
         </div>
       </header>

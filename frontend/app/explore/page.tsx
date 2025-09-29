@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   type ExploreRepository,
@@ -111,6 +112,8 @@ function formatUpdatedAt(updatedAt: string | null) {
 }
 
 export default function ExplorePage() {
+  const router = useRouter();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [activeBadges, setActiveBadges] = useState<RepositoryBadge[]>([]);
   const [repositories, setRepositories] = useState<Repository[]>([]);
@@ -190,6 +193,12 @@ export default function ExplorePage() {
     );
   }, [filteredRepositories, repositories, selectedRepositoryId]);
 
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("username");
+    router.push("/login");
+  };
+
   const handleToggleBadge = (badge: RepositoryBadge) => {
     setActiveBadges((current) =>
       current.includes(badge)
@@ -224,9 +233,21 @@ export default function ExplorePage() {
             <nav className="flex items-center gap-3 text-sm font-semibold uppercase tracking-wide text-slate-100">
               <Link
                 href="/dashboard"
-                className="rounded-full bg-white/10 px-4 py-2 transition hover:bg-white/20"
+                className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
               >
                 Dashboard
+              </Link>
+              <Link
+                href="/repositories"
+                className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+              >
+                Repositories
+              </Link>
+              <Link
+                href="/explore"
+                className="rounded-full bg-white/10 px-4 py-2 text-white transition hover:bg-white/20"
+              >
+                Explore
               </Link>
               <Link
                 href="/profile"
@@ -234,6 +255,12 @@ export default function ExplorePage() {
               >
                 Profile
               </Link>
+              <button
+                onClick={handleLogout}
+                className="rounded-full bg-sky-500 px-4 py-2 font-semibold uppercase tracking-wide text-sm text-white transition hover:bg-sky-400"
+              >
+                Log out
+              </button>
             </nav>
           </div>
         </div>
