@@ -55,17 +55,9 @@ public class AuthController {
         Role userRole = roleRepository.findByName(RoleName.ROLE_ADMIN)
                 .orElseThrow(() -> new RuntimeException("Default role not found"));
 
-        Role userRole2 = roleRepository.findByName(RoleName.ROLE_USER)
-                .orElseThrow(() -> new RuntimeException("Default role not found"));
-
         userRoleRepository.save(UserRole.builder()
                 .user(user)
                 .role(userRole)
-                .build());
-        
-        userRoleRepository.save(UserRole.builder()
-                .user(user)
-                .role(userRole2)
                 .build());
 
         auditLogService.recordAction(user, "USER_REGISTER", "USER", user.getId().toString(), Map.of(
