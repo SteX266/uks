@@ -20,6 +20,11 @@ export default function LoginPage() {
     try {
       const response = await loginUser({ username, password });
       localStorage.setItem("authToken", response.token);
+
+      const roles = response.user.roles || [];
+      const role = roles.some((r) => r.includes("ADMIN")) ? "ADMIN" : "USER";
+
+      localStorage.setItem("role", role);
       localStorage.setItem("username", username);
       router.push("/dashboard");
     } catch (err) {

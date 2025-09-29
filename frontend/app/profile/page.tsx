@@ -177,6 +177,18 @@ export default function ProfilePage() {
   }, []);
 
   useEffect(() => {
+    const token = localStorage.getItem("authToken");
+    const userRole = localStorage.getItem("role");
+
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+
+    if (userRole !== "USER") {
+      router.replace("/admin/dashboard");
+    }
+
     mountedRef.current = true;
     void loadProfile();
 

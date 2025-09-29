@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FormEvent, useCallback, useMemo, useState } from "react";
 import {
@@ -55,6 +56,8 @@ function highlightMarkup(value: string | null) {
 }
 
 export default function AnalyticsPage() {
+  const router = useRouter();
+
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusMessage>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -79,6 +82,12 @@ export default function AnalyticsPage() {
     }
     return Math.max(1, Math.ceil(total / PAGE_SIZE));
   }, [total]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("username");
+    router.push("/login");
+  };
 
   const executeSearch = useCallback(
     async (targetPage: number) => {
@@ -209,17 +218,18 @@ export default function AnalyticsPage() {
             </div>
             <nav className="flex flex-wrap items-center gap-3 text-sm text-slate-300/80">
               <Link
-                href="/dashboard"
+                href="/admin/dashboard"
                 className="rounded-full border border-white/30 px-4 py-2 transition hover:border-white hover:text-white"
               >
                 Dashboard
               </Link>
-              <Link
-                href="/admin/users"
-                className="rounded-full border border-white/30 px-4 py-2 transition hover:border-white hover:text-white"
+
+              <button
+                onClick={handleLogout}
+                className="rounded-full bg-sky-500 px-4 py-2 font-semibold uppercase tracking-wide text-sm text-white transition hover:bg-sky-400"
               >
-                Admin users
-              </Link>
+                Log out
+              </button>
             </nav>
           </div>
         </div>

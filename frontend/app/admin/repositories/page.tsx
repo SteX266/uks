@@ -18,7 +18,7 @@ import {
   fetchRepositoryArtifacts,
   fetchRepositoryTags,
   updateRepository,
-} from "../lib/api";
+} from "../../lib/api";
 
 type VisibilityOption = "public" | "private";
 
@@ -173,18 +173,6 @@ export default function RepositoriesPage() {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    const userRole = localStorage.getItem("role");
-
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
-
-    if (userRole !== "USER") {
-      router.replace("/admin/repositories");
-    }
-
     if (repositories.length === 0) {
       setSelectedRepositoryId(null);
       return;
@@ -591,7 +579,7 @@ export default function RepositoriesPage() {
         <div className="border-b border-white/10">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
             <Link
-              href="/dashboard"
+              href="/admin/dashboard"
               className="flex items-center gap-3 text-left"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500 text-lg font-semibold">
@@ -608,28 +596,34 @@ export default function RepositoriesPage() {
             </Link>
             <nav className="flex items-center gap-3 text-sm font-semibold uppercase tracking-wide text-slate-100">
               <Link
-                href="/dashboard"
-                className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+                href="/admin/dashboard"
+                className="rounded-full border border-white/30 px-4 py-2 transition hover:border-white hover:text-white"
               >
                 Dashboard
               </Link>
               <Link
-                href="/repositories"
-                className="rounded-full bg-white/10 px-4 py-2 text-white transition hover:bg-white/20"
+                href="/admin/repositories"
+                className="rounded-full border border-white/30 px-4 py-2 transition hover:border-white hover:text-white"
               >
                 Repositories
               </Link>
               <Link
-                href="/explore"
-                className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+                href="/admin/explore"
+                className="rounded-full border border-white/30 px-4 py-2 transition hover:border-white hover:text-white"
               >
                 Explore
               </Link>
               <Link
-                href="/profile"
-                className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+                href="/admin/users"
+                className="rounded-full border border-white/30 px-4 py-2 transition hover:border-white hover:text-white"
               >
-                Profile
+                Users
+              </Link>
+              <Link
+                href="/admin/analytics"
+                className="rounded-full border border-white/30 px-4 py-2 transition hover:border-white hover:text-white"
+              >
+                Analytics
               </Link>
               <button
                 onClick={handleLogout}

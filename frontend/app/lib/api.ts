@@ -67,8 +67,23 @@ export async function registerUser(payload: RegisterPayload) {
   });
 }
 
+export type UserRole = "USER" | "ADMIN" | "SUPER_ADMIN";
+
+export interface AuthenticatedUser {
+  username: string;
+  displayName: string | null;
+  email: string;
+  active: boolean;
+  roles: UserRole[];
+}
+
+export interface LoginResponse {
+  token: string;
+  user: AuthenticatedUser;
+}
+
 export async function loginUser(payload: LoginPayload) {
-  return request<{ token: string }>("/auth/login", {
+  return request<LoginResponse>("/auth/login", {
     method: "POST",
     body: payload,
   });

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import {
@@ -124,6 +125,7 @@ function formatRelativeTime(timestamp: string | null) {
 }
 
 export default function AdminUsersPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [focusedUserId, setFocusedUserId] = useState<number | null>(null);
@@ -195,6 +197,12 @@ export default function AdminUsersPage() {
       setEditForm(emptyEditForm);
     }
   }, [focusedUser]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("username");
+    router.push("/login");
+  };
 
   const filteredUsers = useMemo(() => {
     if (!searchTerm.trim()) {
@@ -449,7 +457,7 @@ export default function AdminUsersPage() {
           <div className="border-b border-white/10">
             <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
               <Link
-                href="/dashboard"
+                href="/admin/dashboard"
                 className="flex items-center gap-3 text-left"
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500 text-lg font-semibold">
@@ -466,36 +474,41 @@ export default function AdminUsersPage() {
               </Link>
               <nav className="flex items-center gap-3 text-sm font-semibold uppercase tracking-wide text-slate-100">
                 <Link
-                  href="/dashboard"
-                  className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+                  href="/admin/dashboard"
+                  className="rounded-full border border-white/30 px-4 py-2 transition hover:border-white hover:text-white"
                 >
                   Dashboard
                 </Link>
                 <Link
-                  href="/repositories"
-                  aria-current="page"
-                  className="rounded-full bg-white/10 px-4 py-2 text-white transition hover:bg-white/20"
+                  href="/admin/repositories"
+                  className="rounded-full border border-white/30 px-4 py-2 transition hover:border-white hover:text-white"
                 >
                   Repositories
                 </Link>
                 <Link
-                  href="/explore"
-                  className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+                  href="/admin/explore"
+                  className="rounded-full border border-white/30 px-4 py-2 transition hover:border-white hover:text-white"
                 >
                   Explore
                 </Link>
                 <Link
-                  href="/profile"
-                  className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+                  href="/admin/users"
+                  className="rounded-full border border-white/30 px-4 py-2 transition hover:border-white hover:text-white"
                 >
-                  Profile
+                  Users
                 </Link>
                 <Link
                   href="/admin/analytics"
-                  className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+                  className="rounded-full border border-white/30 px-4 py-2 transition hover:border-white hover:text-white"
                 >
                   Analytics
                 </Link>
+                <button
+                  onClick={handleLogout}
+                  className="rounded-full bg-sky-500 px-4 py-2 font-semibold uppercase tracking-wide text-sm text-white transition hover:bg-sky-400"
+                >
+                  Log out
+                </button>
               </nav>
             </div>
           </div>
