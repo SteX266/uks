@@ -17,6 +17,7 @@ import {
   updateProfile as updateProfileRequest,
   ProfileResponse,
 } from "../lib/api";
+import { useProtectedRoute } from "../hooks/useProtectedRoute";
 
 type PasswordFormState = {
   currentPassword: string;
@@ -37,8 +38,8 @@ type StatusMessage = {
 
 const quickLinks = [
   { href: "/explore", label: "Browse repositories" },
-  { href: "/admin/users", label: "Manage users" },
   { href: "/repositories", label: "Create repository" },
+  { href: "/dashboard", label: "View dashboard" },
 ];
 
 const emptyPasswordForm: PasswordFormState = {
@@ -135,6 +136,11 @@ export default function ProfilePage() {
 
   const mountedRef = useRef(true);
 
+  const { user: currentUser, isLoading: isAuthorizing } = useProtectedRoute({
+    allowedRoles: ["USER"],
+    redirectOnFail: "/admin/dashboard",
+  });
+
   const loadProfile = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
@@ -175,12 +181,19 @@ export default function ProfilePage() {
 
   useEffect(() => {
     mountedRef.current = true;
+
+    if (isAuthorizing || !currentUser) {
+      return () => {
+        mountedRef.current = false;
+      };
+    }
+
     void loadProfile();
 
     return () => {
       mountedRef.current = false;
     };
-  }, [loadProfile]);
+  }, [currentUser, isAuthorizing, loadProfile]);
 
   const initials = useMemo(() => {
     const name = profile?.displayName ?? profile?.username ?? "";
@@ -385,7 +398,7 @@ export default function ProfilePage() {
     }
   };
 
-  if (isLoading) {
+  if (isAuthorizing || isLoading) {
     return (
       <main className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-6 py-12 text-slate-100">
         <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-center gap-6">

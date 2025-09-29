@@ -60,6 +60,21 @@ export interface LoginPayload {
   password: string;
 }
 
+export type UserRole = "USER" | "ADMIN" | "SUPER_ADMIN";
+
+export interface AuthenticatedUser {
+  username: string;
+  displayName: string | null;
+  email: string;
+  active: boolean;
+  roles: UserRole[];
+}
+
+export interface LoginResponse {
+  token: string;
+  user: AuthenticatedUser;
+}
+
 export async function registerUser(payload: RegisterPayload) {
   return request<{ message: string }>("/auth/register", {
     method: "POST",
@@ -68,9 +83,16 @@ export async function registerUser(payload: RegisterPayload) {
 }
 
 export async function loginUser(payload: LoginPayload) {
-  return request<{ token: string }>("/auth/login", {
+  return request<LoginResponse>("/auth/login", {
     method: "POST",
     body: payload,
+  });
+}
+
+export async function fetchCurrentUser() {
+  return request<AuthenticatedUser>("/auth/me", {
+    method: "GET",
+    auth: true,
   });
 }
 
@@ -104,7 +126,7 @@ export interface UserRepository {
   description: string | null;
   isPublic: boolean;
   isOfficial: boolean;
-  ownerUsername: string;
+  ownerUsername: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -156,6 +178,39 @@ export async function updateRepository(id: number, payload: RepositoryPayload) {
 
 export async function deleteRepository(id: number) {
   return request<void>(`/repositories/${id}`, {
+    method: "DELETE",
+    auth: true,
+  });
+}
+
+export async function fetchOfficialRepositories() {
+  return request<UserRepository[]>("/admin/repositories/official", {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function createOfficialRepository(payload: RepositoryPayload) {
+  return request<UserRepository>("/admin/repositories/official", {
+    method: "POST",
+    body: payload,
+    auth: true,
+  });
+}
+
+export async function updateOfficialRepository(
+  id: number,
+  payload: RepositoryPayload,
+) {
+  return request<UserRepository>(`/admin/repositories/official/${id}`, {
+    method: "PUT",
+    body: payload,
+    auth: true,
+  });
+}
+
+export async function deleteOfficialRepository(id: number) {
+  return request<void>(`/admin/repositories/official/${id}`, {
     method: "DELETE",
     auth: true,
   });

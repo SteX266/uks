@@ -7,6 +7,7 @@ import {
   type LogSearchHit,
   searchSystemLogs,
 } from "../../lib/api";
+import { useProtectedRoute } from "../../hooks/useProtectedRoute";
 
 type StatusMessage = { kind: "success" | "error"; text: string } | null;
 
@@ -55,6 +56,10 @@ function highlightMarkup(value: string | null) {
 }
 
 export default function AnalyticsPage() {
+  const { isLoading: isAuthorizing } = useProtectedRoute({
+    allowedRoles: ["ADMIN", "SUPER_ADMIN"],
+    redirectOnFail: "/dashboard",
+  });
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusMessage>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -188,6 +193,16 @@ export default function AnalyticsPage() {
     const end = page * PAGE_SIZE + results.length;
     return `${start}-${end} of ${total} results`;
   }, [page, results.length, total]);
+
+  if (isAuthorizing) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 py-12 text-slate-100">
+        <p className="rounded-full border border-white/20 bg-white/5 px-6 py-3 text-sm uppercase tracking-[0.4em] text-sky-200">
+          Loading analytics...
+        </p>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">

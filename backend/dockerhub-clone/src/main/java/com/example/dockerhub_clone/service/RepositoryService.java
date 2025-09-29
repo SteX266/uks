@@ -62,6 +62,43 @@ public class RepositoryService {
         return mapToDto(saved);
     }
 
+    public RepositoryResponseDto createOfficialRepository(CreateRepositoryRequestDto request) {
+        User currentUser = authService.getCurrentUser();
+
+        String name = request.getName() != null ? request.getName().trim() : "";
+        if (name.isEmpty()) {
+            throw new RuntimeException("Repository name is required");
+        }
+        if (name.contains("/")) {
+            throw new RuntimeException("Official repository name cannot contain '/' characters");
+        }
+
+        repoRepository.findByIsOfficialTrueAndNameIgnoreCase(name)
+                .ifPresent(existing -> {
+                    throw new RuntimeException("An official repository with this name already exists");
+                });
+
+        DockerRepository repo = DockerRepository.builder()
+                .name(name)
+                .description(request.getDescription())
+                .isPublic(request.isPublic())
+                .isOfficial(true)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+
+        DockerRepository saved = repoRepository.save(repo);
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("name", saved.getName());
+        metadata.put("public", saved.isPublic());
+        metadata.put("official", true);
+
+        auditLogService.recordAction(currentUser, "REPOSITORY_CREATE_OFFICIAL", "REPOSITORY", saved.getId().toString(), metadata);
+
+        return mapToDto(saved);
+    }
+
     /**
      * Owner or collaborator with WRITE/ADMIN can edit repository.
      */
@@ -95,6 +132,50 @@ public class RepositoryService {
         return mapToDto(saved);
     }
 
+    public RepositoryResponseDto updateOfficialRepository(Long repoId, CreateRepositoryRequestDto request) {
+        DockerRepository repo = findRepo(repoId);
+        if (!repo.isOfficial()) {
+            throw new RuntimeException("Repository is not marked as official");
+        }
+
+        User currentUser = authService.getCurrentUser();
+
+        if (!isAdmin(currentUser)) {
+            throw new RuntimeException("Not authorized to edit official repositories");
+        }
+
+        if (request.getName() != null && !request.getName().isBlank()) {
+            String nextName = request.getName().trim();
+            if (nextName.contains("/")) {
+                throw new RuntimeException("Official repository name cannot contain '/' characters");
+            }
+            if (!nextName.equalsIgnoreCase(repo.getName())) {
+                repoRepository.findByIsOfficialTrueAndNameIgnoreCase(nextName)
+                        .ifPresent(existing -> {
+                            if (!existing.getId().equals(repo.getId())) {
+                                throw new RuntimeException("An official repository with this name already exists");
+                            }
+                        });
+                repo.setName(nextName);
+            }
+        }
+
+        repo.setDescription(request.getDescription());
+        repo.setPublic(request.isPublic());
+        repo.setUpdatedAt(Instant.now());
+
+        DockerRepository saved = repoRepository.save(repo);
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("name", saved.getName());
+        metadata.put("public", saved.isPublic());
+        metadata.put("official", true);
+
+        auditLogService.recordAction(currentUser, "REPOSITORY_UPDATE_OFFICIAL", "REPOSITORY", saved.getId().toString(), metadata);
+
+        return mapToDto(saved);
+    }
+
     /**
      * Owner or collaborator with ADMIN can delete repository.
      */
@@ -111,6 +192,27 @@ public class RepositoryService {
         metadata.put("public", repo.isPublic());
 
         auditLogService.recordAction(currentUser, "REPOSITORY_DELETE", "REPOSITORY", repo.getId().toString(), metadata);
+
+        repoRepository.delete(repo);
+    }
+
+    public void deleteOfficialRepository(Long repoId) {
+        DockerRepository repo = findRepo(repoId);
+        if (!repo.isOfficial()) {
+            throw new RuntimeException("Repository is not marked as official");
+        }
+
+        User currentUser = authService.getCurrentUser();
+        if (!isAdmin(currentUser)) {
+            throw new RuntimeException("Not authorized to delete official repositories");
+        }
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("name", repo.getName());
+        metadata.put("public", repo.isPublic());
+        metadata.put("official", true);
+
+        auditLogService.recordAction(currentUser, "REPOSITORY_DELETE_OFFICIAL", "REPOSITORY", repo.getId().toString(), metadata);
 
         repoRepository.delete(repo);
     }
@@ -156,6 +258,13 @@ public class RepositoryService {
     }
 
     @Transactional(readOnly = true)
+    public List<RepositoryResponseDto> listOfficialRepositories() {
+        return repoRepository.findByIsOfficialTrueOrderByNameAsc().stream()
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<ExploreRepositoryResponseDto> listPublicRepositoriesForExplore() {
         return repoRepository.findByIsPublicTrueOrderByStarsCountDesc()
                 .stream()
@@ -166,7 +275,11 @@ public class RepositoryService {
     // --- Permission Helpers ---
 
     private boolean canRead(User user, DockerRepository repo) {
-        return repo.getOwner().equals(user) ||
+        if (repo.isOfficial()) {
+            return repo.isPublic() || isAdmin(user);
+        }
+
+        return isOwner(user, repo) ||
                 collaboratorRepository.findByRepositoryAndUser(repo, user)
                         .map(c -> c.getPermission() == CollaboratorPermission.READ
                                 || c.getPermission() == CollaboratorPermission.WRITE
@@ -175,7 +288,11 @@ public class RepositoryService {
     }
 
     private boolean canWrite(User user, DockerRepository repo) {
-        return repo.getOwner().equals(user) ||
+        if (repo.isOfficial()) {
+            return isAdmin(user);
+        }
+
+        return isOwner(user, repo) ||
                 collaboratorRepository.findByRepositoryAndUser(repo, user)
                         .map(c -> c.getPermission() == CollaboratorPermission.WRITE
                                 || c.getPermission() == CollaboratorPermission.ADMIN)
@@ -183,7 +300,11 @@ public class RepositoryService {
     }
 
     private boolean canAdmin(User user, DockerRepository repo) {
-        return repo.getOwner().equals(user) ||
+        if (repo.isOfficial()) {
+            return isAdmin(user);
+        }
+
+        return isOwner(user, repo) ||
                 collaboratorRepository.findByRepositoryAndUser(repo, user)
                         .map(c -> c.getPermission() == CollaboratorPermission.ADMIN)
                         .orElse(false);
@@ -203,17 +324,22 @@ public class RepositoryService {
                 .description(repo.getDescription())
                 .isPublic(repo.isPublic())
                 .isOfficial(repo.isOfficial())
-                .ownerUsername(repo.getOwner().getUsername())
+                .ownerUsername(repo.getOwner() != null ? repo.getOwner().getUsername() : null)
                 .createdAt(repo.getCreatedAt())
                 .updatedAt(repo.getUpdatedAt() != null ? repo.getUpdatedAt() : repo.getCreatedAt())
                 .build();
     }
 
     private ExploreRepositoryResponseDto mapToExploreDto(DockerRepository repo) {
+        String namespace = "";
+        if (!repo.isOfficial() && repo.getOwner() != null) {
+            namespace = repo.getOwner().getUsername();
+        }
+
         return ExploreRepositoryResponseDto.builder()
                 .id(repo.getId())
                 .name(repo.getName())
-                .namespace(repo.getOwner() != null ? repo.getOwner().getUsername() : "")
+                .namespace(namespace)
                 .description(repo.getDescription())
                 .badges(resolveBadges(repo))
                 .tags(repo.getTags() == null ? List.of() : repo.getTags().stream()
@@ -223,6 +349,17 @@ public class RepositoryService {
                 .pulls(repo.getPullsCount() == null ? 0L : repo.getPullsCount())
                 .updatedAt(repo.getUpdatedAt() != null ? repo.getUpdatedAt() : repo.getCreatedAt())
                 .build();
+    }
+
+    private boolean isOwner(User user, DockerRepository repo) {
+        return repo.getOwner() != null && repo.getOwner().equals(user);
+    }
+
+    private boolean isAdmin(User user) {
+        return user.getRoles().stream()
+                .map(UserRole::getRole)
+                .map(Role::getName)
+                .anyMatch(roleName -> roleName == RoleName.ROLE_ADMIN || roleName == RoleName.ROLE_SUPER_ADMIN);
     }
 
     private List<String> resolveBadges(DockerRepository repo) {

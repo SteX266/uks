@@ -7,6 +7,7 @@ import {
   type RepositoryBadgeLabel,
   fetchExploreRepositories,
 } from "../lib/api";
+import { useProtectedRoute } from "../hooks/useProtectedRoute";
 
 const badgeDefinitions: { label: RepositoryBadgeLabel; description: string }[] =
   [
@@ -119,8 +120,16 @@ export default function ExplorePage() {
   >(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { isLoading: isAuthorizing } = useProtectedRoute({
+    allowedRoles: ["USER", "ADMIN", "SUPER_ADMIN"],
+    redirectOnFail: "/login",
+  });
 
   useEffect(() => {
+    if (isAuthorizing) {
+      return;
+    }
+
     let isMounted = true;
     setIsLoading(true);
     fetchExploreRepositories()
@@ -142,7 +151,7 @@ export default function ExplorePage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isAuthorizing]);
 
   const filteredRepositories = useMemo(() => {
     return repositories
@@ -303,7 +312,7 @@ export default function ExplorePage() {
         <div className="space-y-6">
           <div className="flex items-center justify-between text-sm text-slate-300">
             <span>
-              {isLoading
+              {isAuthorizing || isLoading
                 ? "Loading repositories..."
                 : `${filteredRepositories.length} repositories found`}
             </span>
@@ -319,7 +328,7 @@ export default function ExplorePage() {
           </div>
 
           <ul className="space-y-4">
-            {isLoading ? (
+            {isAuthorizing || isLoading ? (
               <li className="rounded-2xl border border-white/10 bg-white/5 px-6 py-10 text-center text-sm text-slate-300">
                 Fetching repositories from the registry...
               </li>
@@ -344,7 +353,7 @@ export default function ExplorePage() {
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <p className="text-xs uppercase tracking-[0.3em] text-sky-200">
-                            {repository.namespace}
+                            {repository.namespace || "Docker Official Image"}
                           </p>
                           <h2 className="text-2xl font-semibold text-white">
                             {repository.name}
@@ -422,7 +431,9 @@ export default function ExplorePage() {
                     Selected repository
                   </p>
                   <h2 className="mt-3 text-3xl font-semibold text-white">
-                    {selectedRepository.namespace}/{selectedRepository.name}
+                    {selectedRepository.namespace
+                      ? `${selectedRepository.namespace}/${selectedRepository.name}`
+                      : selectedRepository.name}
                   </h2>
                   <p className="mt-3 text-sm text-slate-200/80">
                     {selectedRepository.description ??

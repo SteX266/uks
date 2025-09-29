@@ -17,6 +17,7 @@ import {
   fetchRepositoryTags,
   updateRepository,
 } from "../lib/api";
+import { useProtectedRoute } from "../hooks/useProtectedRoute";
 
 type VisibilityOption = "public" | "private";
 
@@ -140,8 +141,16 @@ export default function RepositoriesPage() {
   const [pushMediaType, setPushMediaType] = useState(DEFAULT_MEDIA_TYPE);
   const [pushError, setPushError] = useState<string | null>(null);
   const [isPushing, setIsPushing] = useState(false);
+  const { user: currentUser, isLoading: isAuthorizing } = useProtectedRoute({
+    allowedRoles: ["USER"],
+    redirectOnFail: "/admin/dashboard",
+  });
 
   useEffect(() => {
+    if (isAuthorizing || !currentUser) {
+      return;
+    }
+
     let isMounted = true;
     setIsLoading(true);
     setError(null);
@@ -167,7 +176,7 @@ export default function RepositoriesPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [currentUser, isAuthorizing]);
 
   useEffect(() => {
     if (repositories.length === 0) {
@@ -564,6 +573,16 @@ export default function RepositoriesPage() {
     return repositories.find((repo) => repo.id === pendingDeleteId) ?? null;
   }, [pendingDeleteId, repositories]);
 
+  if (isAuthorizing) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 py-12 text-white">
+        <p className="rounded-full border border-white/20 bg-white/5 px-6 py-3 text-sm uppercase tracking-[0.4em] text-sky-200">
+          Loading repositories...
+        </p>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       <header className="border-b border-white/10 bg-slate-950/80 backdrop-blur">
@@ -686,7 +705,7 @@ export default function RepositoriesPage() {
                         <div>
                           <div className="flex items-center gap-2 text-sm uppercase tracking-wide text-slate-300/80">
                             <span className="rounded-full bg-slate-900/80 px-2 py-1 text-xs font-semibold uppercase tracking-widest">
-                              {repo.ownerUsername}
+                              {repo.ownerUsername ?? "—"}
                             </span>
                             <span className="text-xs text-slate-400">•</span>
                             <span className="text-xs font-semibold text-sky-300">
@@ -741,7 +760,7 @@ export default function RepositoriesPage() {
                             Owner
                           </dt>
                           <dd className="text-sm text-white">
-                            {selectedRepository.ownerUsername}
+                            {selectedRepository.ownerUsername ?? "—"}
                           </dd>
                         </div>
                         <div className="flex items-center gap-2">

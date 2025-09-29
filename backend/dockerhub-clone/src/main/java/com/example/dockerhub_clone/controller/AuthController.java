@@ -1,5 +1,7 @@
 package com.example.dockerhub_clone.controller;
 
+import com.example.dockerhub_clone.dto.AuthenticatedUserResponseDto;
+import com.example.dockerhub_clone.dto.LoginResponseDto;
 import com.example.dockerhub_clone.model.Role;
 import com.example.dockerhub_clone.model.RoleName;
 import com.example.dockerhub_clone.model.User;
@@ -9,12 +11,18 @@ import com.example.dockerhub_clone.repository.UserRepository;
 import com.example.dockerhub_clone.repository.UserRoleRepository;
 import com.example.dockerhub_clone.security.JwtUtil;
 import com.example.dockerhub_clone.service.AuditLogService;
+import com.example.dockerhub_clone.service.AuthService;
+import org.springframework.security.access.prepost.PreAuthorize;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -27,6 +35,7 @@ public class AuthController {
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
     private final AuditLogService auditLogService;
+    private final AuthService authService;
 
     @PostMapping("/register")
     public Map<String, String> register(@RequestBody Map<String, String> body) {
@@ -46,21 +55,14 @@ public class AuthController {
 
         userRepository.save(user);
 
-        Role userRole = roleRepository.findByName(RoleName.ROLE_ADMIN)
+        Role userRole = roleRepository.findByName(RoleName.ROLE_USER)
                 .orElseThrow(() -> new RuntimeException("Default role not found"));
 
-        Role userRole2 = roleRepository.findByName(RoleName.ROLE_USER)
-                .orElseThrow(() -> new RuntimeException("Default role not found"));
-
-        userRoleRepository.save(UserRole.builder()
+        UserRole assignment = userRoleRepository.save(UserRole.builder()
                 .user(user)
                 .role(userRole)
                 .build());
-        
-        userRoleRepository.save(UserRole.builder()
-                .user(user)
-                .role(userRole2)
-                .build());
+        user.getRoles().add(assignment);
 
         auditLogService.recordAction(user, "USER_REGISTER", "USER", user.getId().toString(), Map.of(
                 "email", user.getEmail(),
@@ -71,7 +73,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public Map<String, String> login(@RequestBody Map<String, String> body) {
+    public LoginResponseDto login(@RequestBody Map<String, String> body) {
         String username = body.get("username");
         String password = body.get("password");
 
@@ -88,10 +90,45 @@ public class AuthController {
         userRepository.save(user);
 
         String token = jwtUtil.generateToken(username);
+        AuthenticatedUserResponseDto userInfo = mapToAuthenticatedUser(user);
 
         auditLogService.recordAction(user, "USER_LOGIN", "USER", user.getId().toString(), Map.of(
                 "loginAt", user.getUpdatedAt().toString()
         ));
-        return Map.of("token", token);
+        return LoginResponseDto.builder()
+                .token(token)
+                .user(userInfo)
+                .build();
+    }
+
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public AuthenticatedUserResponseDto currentUser() {
+        User user = authService.getCurrentUser();
+        return mapToAuthenticatedUser(user);
+    }
+
+    private AuthenticatedUserResponseDto mapToAuthenticatedUser(User user) {
+        Set<String> roles = user.getRoles().stream()
+                .map(UserRole::getRole)
+                .map(Role::getName)
+                .map(this::formatRole)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        return AuthenticatedUserResponseDto.builder()
+                .username(user.getUsername())
+                .displayName(user.getDisplayName())
+                .email(user.getEmail())
+                .active(user.isActive())
+                .roles(List.copyOf(roles))
+                .build();
+    }
+
+    private String formatRole(RoleName roleName) {
+        return switch (roleName) {
+            case ROLE_ADMIN -> "ADMIN";
+            case ROLE_SUPER_ADMIN -> "SUPER_ADMIN";
+            case ROLE_USER -> "USER";
+        };
     }
 }

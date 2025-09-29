@@ -20,8 +20,14 @@ export default function LoginPage() {
     try {
       const response = await loginUser({ username, password });
       localStorage.setItem("authToken", response.token);
-      localStorage.setItem("username", username);
-      router.push("/dashboard");
+      localStorage.setItem("username", response.user.username);
+
+      const roles = response.user.roles ?? [];
+      const isAdmin = roles.some(
+        (role) => role === "ADMIN" || role === "SUPER_ADMIN",
+      );
+
+      router.push(isAdmin ? "/admin/dashboard" : "/dashboard");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Login failed";
       setError(message);

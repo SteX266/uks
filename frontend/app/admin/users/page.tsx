@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import {
   type AdminUser,
@@ -11,6 +12,7 @@ import {
   fetchAdminUsers,
   updateAdminUser,
 } from "../../lib/api";
+import { useProtectedRoute } from "../../hooks/useProtectedRoute";
 
 type BadgeOption = {
   id: string;
@@ -55,9 +57,9 @@ const badgeOptions: BadgeOption[] = [
 ];
 
 const quickLinks = [
-  { href: "/explore", label: "Browse repositories" },
-  { href: "/repositories", label: "Manage repositories" },
-  { href: "/profile", label: "View profile" },
+  { href: "/explore", label: "Explore repositories" },
+  { href: "/admin/repositories", label: "Official repositories" },
+  { href: "/admin/analytics", label: "Analytics" },
 ];
 
 const emptyEditForm: EditFormState = {
@@ -124,6 +126,7 @@ function formatRelativeTime(timestamp: string | null) {
 }
 
 export default function AdminUsersPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [focusedUserId, setFocusedUserId] = useState<number | null>(null);
@@ -142,8 +145,22 @@ export default function AdminUsersPage() {
   const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
   const [newAdminForm, setNewAdminForm] =
     useState<NewAdminFormState>(emptyNewAdminForm);
+  const { user: currentAdmin, isLoading: isAuthorizing } = useProtectedRoute({
+    allowedRoles: ["ADMIN", "SUPER_ADMIN"],
+    redirectOnFail: "/dashboard",
+  });
+
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("username");
+    router.replace("/login");
+  };
 
   useEffect(() => {
+    if (isAuthorizing || !currentAdmin) {
+      return;
+    }
+
     const loadUsers = async () => {
       setIsLoading(true);
       try {
@@ -162,7 +179,7 @@ export default function AdminUsersPage() {
     };
 
     void loadUsers();
-  }, []);
+  }, [currentAdmin, isAuthorizing]);
 
   useEffect(() => {
     setBadgeSelections(() => {
@@ -389,11 +406,6 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleFocusBadges = (userId: number) => {
-    setFocusedUserId(userId);
-    setStatus(null);
-  };
-
   const handleNewAdminFormChange = (
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -442,6 +454,16 @@ export default function AdminUsersPage() {
     }
   };
 
+  if (isAuthorizing) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 py-12 text-slate-100">
+        <p className="rounded-full border border-white/20 bg-white/5 px-6 py-3 text-sm uppercase tracking-[0.4em] text-sky-200">
+          Loading admin workspace...
+        </p>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-6 py-12 text-slate-100">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
@@ -449,7 +471,7 @@ export default function AdminUsersPage() {
           <div className="border-b border-white/10">
             <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
               <Link
-                href="/dashboard"
+                href="/admin/dashboard"
                 className="flex items-center gap-3 text-left"
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500 text-lg font-semibold">
@@ -464,39 +486,53 @@ export default function AdminUsersPage() {
                   </p>
                 </div>
               </Link>
-              <nav className="flex items-center gap-3 text-sm font-semibold uppercase tracking-wide text-slate-100">
-                <Link
-                  href="/dashboard"
-                  className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+              <div className="flex items-center gap-4">
+                <nav className="flex items-center gap-3 text-sm font-semibold uppercase tracking-wide text-slate-100">
+                  <Link
+                    href="/admin/dashboard"
+                    className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/admin/users"
+                    aria-current="page"
+                    className="rounded-full bg-white/10 px-4 py-2 text-white transition hover:bg-white/20"
+                  >
+                    User management
+                  </Link>
+                  <Link
+                    href="/admin/repositories"
+                    className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+                  >
+                    Repositories
+                  </Link>
+                  <Link
+                    href="/admin/analytics"
+                    className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+                  >
+                    Analytics
+                  </Link>
+                  <Link
+                    href="/explore"
+                    className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+                  >
+                    Explore
+                  </Link>
+                </nav>
+                {currentAdmin ? (
+                  <span className="hidden rounded-full bg-white/5 px-4 py-2 text-xs text-slate-100 md:inline-flex">
+                    {currentAdmin.displayName ?? currentAdmin.username}
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="rounded-full border border-white/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:border-white hover:bg-white/10"
                 >
-                  Dashboard
-                </Link>
-                <Link
-                  href="/repositories"
-                  aria-current="page"
-                  className="rounded-full bg-white/10 px-4 py-2 text-white transition hover:bg-white/20"
-                >
-                  Repositories
-                </Link>
-                <Link
-                  href="/explore"
-                  className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
-                >
-                  Explore
-                </Link>
-                <Link
-                  href="/profile"
-                  className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
-                >
-                  Profile
-                </Link>
-                <Link
-                  href="/admin/analytics"
-                  className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
-                >
-                  Analytics
-                </Link>
-              </nav>
+                  Log out
+                </button>
+              </div>
             </div>
           </div>
         </header>
