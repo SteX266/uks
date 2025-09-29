@@ -26,6 +26,7 @@ type RepositoryFormValues = {
   name: string;
   description: string;
   visibility: VisibilityOption;
+  isOfficial?: boolean;
 };
 
 const DEFAULT_MEDIA_TYPE =
@@ -101,6 +102,7 @@ function sanitizePayload(values: RepositoryFormValues): RepositoryPayload {
     name,
     description: description.length > 0 ? description : null,
     isPublic: values.visibility === "public",
+    isOfficial: values.isOfficial ?? false,
   };
 }
 
@@ -1109,7 +1111,12 @@ function RepositoryEditForm({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
-      await onSubmit({ name, description, visibility });
+      await onSubmit({
+        name,
+        description,
+        visibility,
+        isOfficial: repository.isOfficial,
+      });
     } catch (err) {
       console.error(err);
     }
@@ -1205,7 +1212,12 @@ function CreateRepositoryModal({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
-      await onSubmit({ name, description, visibility });
+      await onSubmit({
+        name,
+        description,
+        visibility,
+        isOfficial: false,
+      });
     } catch (err) {
       console.error(err);
     }

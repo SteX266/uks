@@ -38,14 +38,21 @@ public class RepositoryService {
             throw new RuntimeException("Repository name is required");
         }
 
+        boolean isVerifiedPublisher = currentUser.getBadges() != null
+                && currentUser.getBadges().contains(UserBadge.VERIFIED_PUBLISHER);
+        boolean isSponsoredOss = currentUser.getBadges() != null
+                && currentUser.getBadges().contains(UserBadge.SPONSORED_OSS);
+
         DockerRepository repo = DockerRepository.builder()
                 .name(name)
                 .description(request.getDescription())
                 .isPublic(request.isPublic())
+                .isOfficial(request.isOfficial())
+                .isVerifiedPublisher(isVerifiedPublisher)
+                .isSponsoredOss(isSponsoredOss)
                 .owner(currentUser)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
-                .isOfficial(false)
                 .build();
 
         DockerRepository saved = repoRepository.save(repo);
@@ -79,6 +86,7 @@ public class RepositoryService {
 
         repo.setDescription(request.getDescription());
         repo.setPublic(request.isPublic());
+        repo.setOfficial(request.isOfficial());
         repo.setUpdatedAt(Instant.now());
 
         DockerRepository saved = repoRepository.save(repo);
@@ -203,6 +211,8 @@ public class RepositoryService {
                 .description(repo.getDescription())
                 .isPublic(repo.isPublic())
                 .isOfficial(repo.isOfficial())
+                .isVerifiedPublisher(repo.isVerifiedPublisher())
+                .isSponsoredOss(repo.isSponsoredOss())
                 .ownerUsername(repo.getOwner().getUsername())
                 .createdAt(repo.getCreatedAt())
                 .updatedAt(repo.getUpdatedAt() != null ? repo.getUpdatedAt() : repo.getCreatedAt())

@@ -9,4 +9,6 @@ public class CreateRepositoryRequestDto {
     private String description;
     @JsonProperty("isPublic")
     private boolean isPublic;
+    @JsonProperty("isOfficial")
+    private boolean isOfficial;
 }

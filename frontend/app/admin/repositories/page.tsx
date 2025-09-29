@@ -26,6 +26,7 @@ type RepositoryFormValues = {
   name: string;
   description: string;
   visibility: VisibilityOption;
+  isOfficial: boolean;
 };
 
 const DEFAULT_MEDIA_TYPE =
@@ -101,6 +102,7 @@ function sanitizePayload(values: RepositoryFormValues): RepositoryPayload {
     name,
     description: description.length > 0 ? description : null,
     isPublic: values.visibility === "public",
+    isOfficial: values.isOfficial,
   };
 }
 
@@ -1094,16 +1096,19 @@ function RepositoryEditForm({
     repository.isPublic ? "public" : "private"
   );
 
+  const [isOfficial, setIsOfficial] = useState<boolean>(repository.isOfficial);
+
   useEffect(() => {
     setName(repository.name);
     setDescription(repository.description ?? "");
     setVisibility(repository.isPublic ? "public" : "private");
+    setIsOfficial(repository.isOfficial);
   }, [repository]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
-      await onSubmit({ name, description, visibility });
+      await onSubmit({ name, description, visibility, isOfficial });
     } catch (err) {
       console.error(err);
     }
@@ -1163,6 +1168,18 @@ function RepositoryEditForm({
           ))}
         </div>
       </div>
+      <div className="flex items-center gap-2 text-xs text-slate-200">
+        <input
+          id="edit-is-official"
+          type="checkbox"
+          checked={isOfficial}
+          onChange={(event) => setIsOfficial(event.target.checked)}
+          className="h-4 w-4 rounded border border-white/20 bg-slate-900 text-sky-400 focus:ring-0"
+        />
+        <label htmlFor="edit-is-official" className="select-none">
+          Is official?
+        </label>
+      </div>
       {error ? (
         <div className="rounded-lg border border-rose-500/40 bg-rose-950/30 px-3 py-2 text-[11px] text-rose-200">
           {error}
@@ -1195,11 +1212,12 @@ function CreateRepositoryModal({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<VisibilityOption>("public");
+  const [isOfficial, setIsOfficial] = useState<boolean>(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
-      await onSubmit({ name, description, visibility });
+      await onSubmit({ name, description, visibility, isOfficial });
     } catch (err) {
       console.error(err);
     }
@@ -1276,6 +1294,18 @@ function CreateRepositoryModal({
                 </label>
               ))}
             </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-slate-200">
+            <input
+              id="create-is-official"
+              type="checkbox"
+              checked={isOfficial}
+              onChange={(event) => setIsOfficial(event.target.checked)}
+              className="h-4 w-4 rounded border border-white/20 bg-slate-900 text-sky-400 focus:ring-0"
+            />
+            <label htmlFor="create-is-official" className="select-none">
+              Is official?
+            </label>
           </div>
           {error ? (
             <div className="rounded-lg border border-rose-500/40 bg-rose-950/30 px-3 py-2 text-[11px] text-rose-200">

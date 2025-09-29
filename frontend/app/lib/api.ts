@@ -119,6 +119,8 @@ export interface UserRepository {
   description: string | null;
   isPublic: boolean;
   isOfficial: boolean;
+  isVerifiedPublisher: boolean;
+  isSponsoredOss: boolean;
   ownerUsername: string;
   createdAt: string | null;
   updatedAt: string | null;
@@ -135,6 +137,7 @@ export interface RepositoryPayload {
   name: string;
   description: string | null;
   isPublic: boolean;
+  isOfficial: boolean;
 }
 
 export interface RepositoryArtifact {
