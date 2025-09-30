@@ -26,9 +26,13 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/dockerhub
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
+      # make sure backend knows how to reach elasticsearch by service name
+      ANALYTICS_ELASTICSEARCH_HOST: http://elasticsearch:9200
     depends_on:
       postgres:
         condition: service_healthy
+      elasticsearch:
+        condition: service_started
     ports:
       - "8080:8080"
     restart: on-failure
@@ -69,6 +73,22 @@ services:
     depends_on:
       - postgres
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
 
 volumes:
   postgres_data:
+  es_data:
