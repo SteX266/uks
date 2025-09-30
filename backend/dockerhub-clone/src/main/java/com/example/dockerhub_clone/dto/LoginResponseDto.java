@@ -12,4 +12,5 @@ import lombok.NoArgsConstructor;
 public class LoginResponseDto {
     private String token;
     private AuthenticatedUserDto user;
+    private Boolean isPasswordChangeRequired;
 }

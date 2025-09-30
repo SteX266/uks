@@ -1,4 +1,4 @@
-export const API_BASE_URL = "http://localhost:8080/api";
+export const API_BASE_URL = "http://localhost/api";
 
 interface RequestOptions {
   method?: string;
@@ -80,10 +80,24 @@ export interface AuthenticatedUser {
 export interface LoginResponse {
   token: string;
   user: AuthenticatedUser;
+  isPasswordChangeRequired: boolean;
 }
 
 export async function loginUser(payload: LoginPayload) {
   return request<LoginResponse>("/auth/login", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export interface ChangePasswordPayload {
+  username: string;
+  currentPassword: string;
+  newPassword: string;
+}
+
+export async function changePassword(payload: ChangePasswordPayload) {
+  return request<{ message: string }>("/auth/change-password", {
     method: "POST",
     body: payload,
   });

@@ -1,6 +1,7 @@
 package com.example.dockerhub_clone.controller;
 
 import com.example.dockerhub_clone.dto.AuthenticatedUserDto;
+import com.example.dockerhub_clone.dto.ChangePasswordRequestDto;
 import com.example.dockerhub_clone.dto.LoginResponseDto;
 import com.example.dockerhub_clone.model.Role;
 import com.example.dockerhub_clone.model.RoleName;
@@ -12,6 +13,7 @@ import com.example.dockerhub_clone.repository.UserRoleRepository;
 import com.example.dockerhub_clone.security.JwtUtil;
 import com.example.dockerhub_clone.service.AuditLogService;
 import com.example.dockerhub_clone.service.AuthService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -52,7 +54,7 @@ public class AuthController {
 
         userRepository.save(user);
 
-        Role userRole = roleRepository.findByName(RoleName.ROLE_ADMIN)
+        Role userRole = roleRepository.findByName(RoleName.ROLE_USER)
                 .orElseThrow(() -> new RuntimeException("Default role not found"));
 
         userRoleRepository.save(UserRole.builder()
@@ -82,6 +84,7 @@ public class AuthController {
         if (!user.isActive()) {
             throw new RuntimeException("Account is deactivated");
         }
+
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
 
@@ -90,12 +93,35 @@ public class AuthController {
         LoginResponseDto response = LoginResponseDto.builder()
                 .token(token)
                 .user(buildAuthenticatedUserDto(user))
+                .isPasswordChangeRequired(user.isPasswordChangeRequired())
                 .build();
 
         auditLogService.recordAction(user, "USER_LOGIN", "USER", user.getId().toString(), Map.of(
                 "loginAt", user.getUpdatedAt().toString()
         ));
         return response;
+    }
+
+    @PostMapping("/change-password")
+    public Map<String, String> changePassword(@Valid @RequestBody ChangePasswordRequestDto request) {
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new RuntimeException("Invalid credentials"));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new RuntimeException("Invalid credentials");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setPasswordChangeRequired(false);
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+
+        auditLogService.recordAction(user, "USER_PASSWORD_CHANGE", "USER", user.getId().toString(), Map.of(
+                "username", user.getUsername(),
+                "changedAt", user.getUpdatedAt().toString()
+        ));
+
+        return Map.of("message", "Password updated successfully");
     }
 
     @GetMapping("/me")

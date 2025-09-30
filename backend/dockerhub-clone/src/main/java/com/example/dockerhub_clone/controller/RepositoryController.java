@@ -18,13 +18,13 @@ public class RepositoryController {
 
     private final RepositoryService repositoryService;
 
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('USER','ADMIN','SUPER_ADMIN')")
     @PostMapping
     public ResponseEntity<RepositoryResponseDto> createRepo(@RequestBody CreateRepositoryRequestDto request) {
         return ResponseEntity.ok(repositoryService.createRepo(request));
     }
 
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('USER','ADMIN','SUPER_ADMIN')")
     @GetMapping("/me")
     public ResponseEntity<List<RepositoryResponseDto>> listMyRepos() {
         return ResponseEntity.ok(repositoryService.listMyRepos());
@@ -35,14 +35,14 @@ public class RepositoryController {
         return ResponseEntity.ok(repositoryService.listPublicRepositoriesForExplore());
     }
 
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('USER','ADMIN','SUPER_ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteRepo(@PathVariable Long id) {
         repositoryService.deleteRepo(id);
         return ResponseEntity.noContent().build();
     }
 
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('USER','ADMIN','SUPER_ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<RepositoryResponseDto> editRepo(
             @PathVariable Long id,
@@ -50,7 +50,7 @@ public class RepositoryController {
         return ResponseEntity.ok(repositoryService.editRepo(id, request));
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('USER','ADMIN','SUPER_ADMIN')")
     @PostMapping("/{id}/make-official")
     public ResponseEntity<RepositoryResponseDto> makeOfficial(@PathVariable Long id) {
         return ResponseEntity.ok(repositoryService.markAsOfficial(id));

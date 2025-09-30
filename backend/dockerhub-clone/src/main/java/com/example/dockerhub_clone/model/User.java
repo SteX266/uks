@@ -50,7 +50,9 @@ public class User {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private Set<UserRole> roles = new HashSet<>();
 
-
+    @Builder.Default
+    @Column(nullable = false, name = "password_change_required")
+    private boolean passwordChangeRequired = false;
 
     @PrePersist
     public void prePersist() {
