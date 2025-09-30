@@ -17,7 +17,7 @@ public class ArtifactController {
 
     private final ArtifactService artifactService;
 
-    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    @PreAuthorize("hasAnyRole('USER','ADMIN','SUPER_ADMIN')")
     @PostMapping
     public ResponseEntity<ArtifactResponseDto> createArtifact(
             @PathVariable Long repoId,

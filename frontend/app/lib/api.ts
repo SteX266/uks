@@ -1,4 +1,4 @@
-export const API_BASE_URL = "http://localhost:8080/api";
+export const API_BASE_URL = "http://localhost/api";
 
 interface RequestOptions {
   method?: string;
@@ -67,8 +67,37 @@ export async function registerUser(payload: RegisterPayload) {
   });
 }
 
+export type UserRole = "USER" | "ADMIN" | "SUPER_ADMIN";
+
+export interface AuthenticatedUser {
+  username: string;
+  displayName: string | null;
+  email: string;
+  active: boolean;
+  roles: UserRole[];
+}
+
+export interface LoginResponse {
+  token: string;
+  user: AuthenticatedUser;
+  isPasswordChangeRequired: boolean;
+}
+
 export async function loginUser(payload: LoginPayload) {
-  return request<{ token: string }>("/auth/login", {
+  return request<LoginResponse>("/auth/login", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export interface ChangePasswordPayload {
+  username: string;
+  currentPassword: string;
+  newPassword: string;
+}
+
+export async function changePassword(payload: ChangePasswordPayload) {
+  return request<{ message: string }>("/auth/change-password", {
     method: "POST",
     body: payload,
   });
@@ -104,6 +133,8 @@ export interface UserRepository {
   description: string | null;
   isPublic: boolean;
   isOfficial: boolean;
+  isVerifiedPublisher: boolean;
+  isSponsoredOss: boolean;
   ownerUsername: string;
   createdAt: string | null;
   updatedAt: string | null;
@@ -120,6 +151,7 @@ export interface RepositoryPayload {
   name: string;
   description: string | null;
   isPublic: boolean;
+  isOfficial: boolean;
 }
 
 export interface RepositoryArtifact {

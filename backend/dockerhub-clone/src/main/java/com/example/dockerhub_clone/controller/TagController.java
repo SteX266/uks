@@ -17,7 +17,7 @@ public class TagController {
 
     private final TagService tagService;
 
-    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    @PreAuthorize("hasAnyRole('USER','ADMIN','SUPER_ADMIN')")
     @PostMapping
     public ResponseEntity<TagResponseDto> createTag(
             @PathVariable Long repoId,
@@ -26,7 +26,7 @@ public class TagController {
         return ResponseEntity.ok(tagService.createTag(repoId, request));
     }
 
-    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    @PreAuthorize("hasAnyRole('USER','ADMIN','SUPER_ADMIN')")
     @DeleteMapping("/{tagName}")
     public ResponseEntity<Void> deleteTag(
             @PathVariable Long repoId,
@@ -36,7 +36,7 @@ public class TagController {
         return ResponseEntity.noContent().build();
     }
 
-    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    @PreAuthorize("hasAnyRole('USER','ADMIN','SUPER_ADMIN')")
     @PutMapping("/{oldTag}/retag/{newTag}")
     public ResponseEntity<TagResponseDto> retag(
             @PathVariable Long repoId,

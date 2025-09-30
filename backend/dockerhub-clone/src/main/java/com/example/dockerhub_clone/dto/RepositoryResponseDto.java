@@ -23,4 +23,8 @@ public class RepositoryResponseDto {
     private String ownerUsername;
     private Instant createdAt;
     private Instant updatedAt;
+    @JsonProperty("isVerifiedPublisher")
+    private boolean isVerifiedPublisher;
+    @JsonProperty("isSponsoredOss")
+    private boolean isSponsoredOss;
 }

@@ -1,3 +1,6 @@
+"use client";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 const highlights = [
@@ -19,6 +22,23 @@ const highlights = [
 ];
 
 export default function Home() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const token = localStorage.getItem("authToken");
+    const userRole = localStorage.getItem("role");
+
+    if (!token) {
+      return;
+    }
+
+    if (userRole === "USER") {
+      router.replace("/dashboard");
+    } else {
+      router.replace("/admin/dashboard");
+    }
+  }, []);
+
   return (
     <main className="min-h-screen bg-slate-950 px-6 pb-20 text-white">
       <header className="mx-auto flex max-w-6xl flex-col gap-10 py-20 md:flex-row md:items-center md:justify-between">

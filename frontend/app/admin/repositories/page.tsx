@@ -18,7 +18,7 @@ import {
   fetchRepositoryArtifacts,
   fetchRepositoryTags,
   updateRepository,
-} from "../lib/api";
+} from "../../lib/api";
 
 type VisibilityOption = "public" | "private";
 
@@ -26,7 +26,7 @@ type RepositoryFormValues = {
   name: string;
   description: string;
   visibility: VisibilityOption;
-  isOfficial?: boolean;
+  isOfficial: boolean;
 };
 
 const DEFAULT_MEDIA_TYPE =
@@ -102,7 +102,7 @@ function sanitizePayload(values: RepositoryFormValues): RepositoryPayload {
     name,
     description: description.length > 0 ? description : null,
     isPublic: values.visibility === "public",
-    isOfficial: values.isOfficial ?? false,
+    isOfficial: values.isOfficial,
   };
 }
 
@@ -175,18 +175,6 @@ export default function RepositoriesPage() {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    const userRole = localStorage.getItem("role");
-
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
-
-    if (userRole !== "USER") {
-      router.replace("/admin/repositories");
-    }
-
     if (repositories.length === 0) {
       setSelectedRepositoryId(null);
       return;
@@ -593,7 +581,7 @@ export default function RepositoriesPage() {
         <div className="border-b border-white/10">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
             <Link
-              href="/dashboard"
+              href="/admin/dashboard"
               className="flex items-center gap-3 text-left"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500 text-lg font-semibold">
@@ -610,28 +598,34 @@ export default function RepositoriesPage() {
             </Link>
             <nav className="flex items-center gap-3 text-sm font-semibold uppercase tracking-wide text-slate-100">
               <Link
-                href="/dashboard"
-                className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+                href="/admin/dashboard"
+                className="rounded-full border border-white/30 px-4 py-2 transition hover:border-white hover:text-white"
               >
                 Dashboard
               </Link>
               <Link
-                href="/repositories"
-                className="rounded-full bg-white/10 px-4 py-2 text-white transition hover:bg-white/20"
+                href="/admin/repositories"
+                className="rounded-full border border-white/30 px-4 py-2 transition hover:border-white hover:text-white"
               >
                 Repositories
               </Link>
               <Link
-                href="/explore"
-                className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+                href="/admin/explore"
+                className="rounded-full border border-white/30 px-4 py-2 transition hover:border-white hover:text-white"
               >
                 Explore
               </Link>
               <Link
-                href="/profile"
-                className="rounded-full border border-white/40 px-4 py-2 transition hover:border-white hover:bg-white/10"
+                href="/admin/users"
+                className="rounded-full border border-white/30 px-4 py-2 transition hover:border-white hover:text-white"
               >
-                Profile
+                Users
+              </Link>
+              <Link
+                href="/admin/analytics"
+                className="rounded-full border border-white/30 px-4 py-2 transition hover:border-white hover:text-white"
+              >
+                Analytics
               </Link>
               <button
                 onClick={handleLogout}
@@ -1102,21 +1096,19 @@ function RepositoryEditForm({
     repository.isPublic ? "public" : "private"
   );
 
+  const [isOfficial, setIsOfficial] = useState<boolean>(repository.isOfficial);
+
   useEffect(() => {
     setName(repository.name);
     setDescription(repository.description ?? "");
     setVisibility(repository.isPublic ? "public" : "private");
+    setIsOfficial(repository.isOfficial);
   }, [repository]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
-      await onSubmit({
-        name,
-        description,
-        visibility,
-        isOfficial: repository.isOfficial,
-      });
+      await onSubmit({ name, description, visibility, isOfficial });
     } catch (err) {
       console.error(err);
     }
@@ -1176,6 +1168,18 @@ function RepositoryEditForm({
           ))}
         </div>
       </div>
+      <div className="flex items-center gap-2 text-xs text-slate-200">
+        <input
+          id="edit-is-official"
+          type="checkbox"
+          checked={isOfficial}
+          onChange={(event) => setIsOfficial(event.target.checked)}
+          className="h-4 w-4 rounded border border-white/20 bg-slate-900 text-sky-400 focus:ring-0"
+        />
+        <label htmlFor="edit-is-official" className="select-none">
+          Is official?
+        </label>
+      </div>
       {error ? (
         <div className="rounded-lg border border-rose-500/40 bg-rose-950/30 px-3 py-2 text-[11px] text-rose-200">
           {error}
@@ -1208,16 +1212,12 @@ function CreateRepositoryModal({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<VisibilityOption>("public");
+  const [isOfficial, setIsOfficial] = useState<boolean>(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
-      await onSubmit({
-        name,
-        description,
-        visibility,
-        isOfficial: false,
-      });
+      await onSubmit({ name, description, visibility, isOfficial });
     } catch (err) {
       console.error(err);
     }
@@ -1294,6 +1294,18 @@ function CreateRepositoryModal({
                 </label>
               ))}
             </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-slate-200">
+            <input
+              id="create-is-official"
+              type="checkbox"
+              checked={isOfficial}
+              onChange={(event) => setIsOfficial(event.target.checked)}
+              className="h-4 w-4 rounded border border-white/20 bg-slate-900 text-sky-400 focus:ring-0"
+            />
+            <label htmlFor="create-is-official" className="select-none">
+              Is official?
+            </label>
           </div>
           {error ? (
             <div className="rounded-lg border border-rose-500/40 bg-rose-950/30 px-3 py-2 text-[11px] text-rose-200">

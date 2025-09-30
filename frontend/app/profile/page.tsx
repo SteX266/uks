@@ -11,6 +11,8 @@ import {
 } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+
 import {
   fetchProfile,
   updatePassword as updatePasswordRequest,
@@ -114,6 +116,7 @@ function formatRelativeTime(iso: string | null) {
 }
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [profileForm, setProfileForm] = useState<ProfileFormState>({
     displayName: "",
@@ -174,6 +177,18 @@ export default function ProfilePage() {
   }, []);
 
   useEffect(() => {
+    const token = localStorage.getItem("authToken");
+    const userRole = localStorage.getItem("role");
+
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+
+    if (userRole !== "USER") {
+      router.replace("/admin/dashboard");
+    }
+
     mountedRef.current = true;
     void loadProfile();
 
@@ -197,6 +212,12 @@ export default function ProfilePage() {
 
     return (parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "");
   }, [profile?.displayName, profile?.username]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("username");
+    router.push("/login");
+  };
 
   const handleStartEditing = () => {
     if (!profile) {
@@ -473,6 +494,12 @@ export default function ProfilePage() {
                 >
                   Profile
                 </Link>
+                <button
+                  onClick={handleLogout}
+                  className="rounded-full bg-sky-500 px-4 py-2 font-semibold uppercase tracking-wide text-sm text-white transition hover:bg-sky-400"
+                >
+                  Log out
+                </button>
               </nav>
             </div>
           </div>

@@ -18,7 +18,7 @@ public class CollaboratorController {
 
     private final CollaboratorService collaboratorService;
 
-    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    @PreAuthorize("hasAnyRole('USER','ADMIN','SUPER_ADMIN')")
     @PostMapping
     public ResponseEntity<?> addCollaborator(@PathVariable Long repoId,
                                              @RequestBody AddCollaboratorRequestDto request) {
@@ -26,7 +26,7 @@ public class CollaboratorController {
         return ResponseEntity.ok().build();
     }
 
-    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    @PreAuthorize("hasAnyRole('USER','ADMIN','SUPER_ADMIN')")
     @DeleteMapping("/{username}")
     public ResponseEntity<?> removeCollaborator(@PathVariable Long repoId,
                                                 @PathVariable String username) {
@@ -34,7 +34,7 @@ public class CollaboratorController {
         return ResponseEntity.noContent().build();
     }
 
-    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    @PreAuthorize("hasAnyRole('USER','ADMIN','SUPER_ADMIN')")
     @GetMapping
     public ResponseEntity<List<CollaboratorResponseDto>> listCollaborators(@PathVariable Long repoId) {
         return ResponseEntity.ok(collaboratorService.listCollaborators(repoId));
